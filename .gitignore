@@ -1,0 +1,16 @@
+browser_profile/
+__pycache__/
+*.py[cod]
+*$py.class
+*.log
+.env
+.antigravitycli/
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+ENV/
+.idea/
+.vscode/
+

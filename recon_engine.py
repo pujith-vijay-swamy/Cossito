@@ -257,7 +257,7 @@ class ReconEngine:
         # ⚡ Direct Fast-Track Reconnaissance Engine (Instant 1.5s vs 60-90s)
         if page is not None:
             try:
-                # Progressive hydration poll: single-page applications (MentorPick, LeetCode) take 2-4s to load markdown/tabs
+                # Progressive hydration poll: single-page applications take 2-4s to load markdown/tabs
                 extracted_text = ""
                 section_questions = []
                 embedded_images = []
@@ -703,7 +703,7 @@ class ReconEngine:
                 ];
                 const allLinks = Array.from(document.querySelectorAll(candidateSelectors.join(',')));
 
-                // 1. Support matching by task.platform_task.title (e.g. Mantine NavLinks on MentorPick)
+                // 1. Support matching by task.platform_task.title (e.g. Mantine NavLinks on coding platforms)
                 if (taskTitle && taskTitle.length > 1) {
                     for (const el of allLinks) {
                         if (el.querySelector('.mantine-NavLink-chevron, [data-chevron], [class*="chevron"], [class*="rightSection"] svg') ||

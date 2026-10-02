@@ -1,7 +1,7 @@
 """
 platform_adapters.py — Platform-specific result parsing and task identity detection.
 
-Defines adapters for coding platforms (generic fallback, HackerRank, LeetCode, CCBP).
+Defines adapters for coding platforms (generic fallback with progressive DOM detection).
 Parses test results, detects terminal execution states, and extracts task identity.
 
 Schema version: 2.0

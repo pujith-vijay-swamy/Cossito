@@ -221,7 +221,7 @@ def is_navigation_or_overview_text(text: str) -> bool:
         return True
 
     # 3. Check if text starts with navbar sequence
-    nav_prefix_pattern = r'^(?:mentorpick|leetcode|hackerrank|codechef|codeforces)?\s*(?:home|problems|courses|submissions|compete|blogs)'
+    nav_prefix_pattern = r'^(?:[a-zA-Z0-9_-]+\s+)?(?:home|problems|courses|submissions|compete|blogs)\b'
     if re.search(nav_prefix_pattern, t_lower):
         return True
 
@@ -305,7 +305,7 @@ async def extract_problem_from_dom(
                     if (count >= 3) return true;
                 }
 
-                if (/^(?:mentorpick|leetcode|hackerrank|codechef|codeforces)?\s*(?:home|problems|courses|submissions|compete|blogs)/i.test(tLower)) {
+                if (/^(?:[a-zA-Z0-9_-]+\s+)?(?:home|problems|courses|submissions|compete|blogs)\b/i.test(tLower)) {
                     return true;
                 }
 

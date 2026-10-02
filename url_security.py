@@ -115,7 +115,7 @@ class URLSecurityGate:
 
     @staticmethod
     def extract_root_domain(host: str) -> str:
-        """Extract root domain (e.g. mentorpick.com from app.mentorpick.com)."""
+        """Extract root domain (e.g. example.com from app.example.com)."""
         if not host:
             return ""
         parts = host.split(".")

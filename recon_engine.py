@@ -90,6 +90,22 @@ class ReconEngine:
         initial_design: str = "",
     ) -> list[CodingTask]:
         """Build CodingTask list from section question candidates, binding extracted_text to the active question."""
+        # The same leaf can appear in several navigation views. Collapse exact
+        # normalized identities before assigning queue positions; keep evidence
+        # from every occurrence (the active copy may be encountered last).
+        unique: dict[tuple[str, str], dict] = {}
+        for candidate in candidates:
+            title = " ".join((candidate.get("text") or "").split()).casefold()
+            destination = candidate.get("url") or candidate.get("href") or ""
+            identity = (str(destination).strip(), title if not destination else "")
+            if not any(identity):
+                continue
+            if identity not in unique:
+                unique[identity] = dict(candidate)
+            else:
+                for flag in ("active", "completed"):
+                    unique[identity][flag] = bool(unique[identity].get(flag) or candidate.get(flag))
+        candidates = list(unique.values())
         tasks: list[CodingTask] = []
         clean_desc = clean_extracted_problem_text(extracted_text)
         valid_desc = clean_desc if (len(clean_desc) > 30 and not _is_navigation_or_overview_text(clean_desc)) else ""
@@ -593,7 +609,10 @@ class ReconEngine:
             self._orch._log("⚠️ Recon LLM produced non-JSON output. Executing DOM Fallback TaskQueue generation...", "warn")
             parsed = {"recon_summary": "Extracted problem statement directly from page DOM", "tasks": []}
 
-        # Build TaskQueue from parsed JSON.
+        return self._build_queue_from_recon(parsed, raw_content)
+
+    def _build_queue_from_recon(self, parsed: dict, raw_content: str = "") -> TaskQueue:
+        """Reconcile model output with observed leaf questions before execution."""
         tasks: list[CodingTask] = []
         parsed_tasks = parsed.get("tasks", [])
 
@@ -602,15 +621,26 @@ class ReconEngine:
         real_qs = [q for q in detected if not _is_section_header_text(q.get("text", ""))]
         candidates = real_qs if real_qs else detected
 
-        if len(candidates) > 1 or (len(candidates) > 0 and len(parsed_tasks) <= 1):
-            self._orch._log(f"⚡ Multi-task auto-expansion: Section scanner detected {len(candidates)} questions on the page! Creating task queue for ALL {len(candidates)} tasks.", "success")
+        if candidates:
             raw_initial_desc = parsed_tasks[0].get("description", "Coding challenge") if parsed_tasks else "Coding challenge"
             initial_desc = clean_extracted_problem_text(raw_initial_desc) or "Coding challenge"
             initial_design = parsed_tasks[0].get("visual_design_spec", "") if parsed_tasks else ""
             tasks = self._build_tasks_from_candidates(candidates, initial_desc, initial_design)
+            self._orch._log(f"Recon: created {len(tasks)} unique tasks from observed page questions.", "success")
         elif parsed_tasks:
-            for i, item in enumerate(parsed_tasks):
-                task = CodingTask.from_v1_dict(item, queue_index=i)
+            seen: set[tuple[str, str]] = set()
+            for item in parsed_tasks:
+                # Generated task numbers are not evidence of distinct problems.
+                # Compare full statements and targets, retaining punctuation and
+                # numbers that distinguish exercises. An editor selector alone
+                # is not an identity: several problems can share one editor.
+                selector = (item.get("target_selector") or "").strip()
+                description = " ".join((item.get("description") or "").split())
+                identity = (selector, description)
+                if identity[1] and identity in seen:
+                    continue
+                seen.add(identity)
+                task = CodingTask.from_v1_dict(item, queue_index=len(tasks))
                 tasks.append(task)
         else:
             # Fallback: create single task from raw DOM extraction text if no section list found

@@ -18,6 +18,47 @@ from recon_engine import ReconEngine
 
 class TestReconAndDom(unittest.TestCase):
 
+    def test_observed_single_question_overrides_multiple_model_tasks(self):
+        orch = MagicMock()
+        orch.url = "https://example.test/exercise"
+        orch._detected_section_questions = [{"text": "Sum Digits", "active": True}]
+        queue = ReconEngine(orch)._build_queue_from_recon({"tasks": [
+            {"task_id": 1, "description": "Sum the digits of the input integer."},
+            {"task_id": 2, "description": "Calculate the digit sum of the integer."},
+        ]})
+        self.assertEqual(len(queue.tasks), 1)
+        self.assertEqual(queue.tasks[0].platform_task.title, "Sum Digits")
+
+    def test_duplicate_candidates_merge_evidence_before_indexing(self):
+        tasks = ReconEngine(MagicMock())._build_tasks_from_candidates([
+            {"text": "Sum Digits"},
+            {"text": " sum   digits ", "active": True, "completed": True},
+            {"text": "Count Digits"},
+        ], "Sum Digits Description Given an integer, compute the sum of its digits.")
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual([task.queue_index for task in tasks], [0, 1])
+        self.assertEqual(tasks[0].state.value, "passed")
+        self.assertIn("Given an integer", tasks[0].description)
+
+    def test_same_title_at_distinct_destinations_is_not_merged(self):
+        tasks = ReconEngine(MagicMock())._build_tasks_from_candidates([
+            {"text": "Exercise", "href": "/exercise/1"},
+            {"text": "Exercise", "href": "/exercise/2"},
+        ], "")
+        self.assertEqual(len(tasks), 2)
+
+    def test_model_duplicate_statements_ignore_generated_task_numbers(self):
+        orch = MagicMock()
+        orch.url = "https://example.test/exercise"
+        orch._detected_section_questions = []
+        queue = ReconEngine(orch)._build_queue_from_recon({"tasks": [
+            {"task_id": 1, "description": "Print 1 to N", "target_selector": "#editor"},
+            {"task_id": 2, "description": "Print  1 to N", "target_selector": "#editor"},
+            {"task_id": 3, "description": "Print N to 1", "target_selector": "#editor"},
+        ]})
+        self.assertEqual([task.description for task in queue.tasks], ["Print 1 to N", "Print N to 1"])
+        self.assertEqual([task.queue_index for task in queue.tasks], [0, 1])
+
     def test_is_navigation_or_overview_text_user_dump(self):
         user_dump = (
             "MentorPick Home Problems Submissions Blogs Compete Courses Code My Doubts "

@@ -685,7 +685,10 @@ async def extract_problem_from_dom(
             ];
             let candidateElems = Array.from(document.querySelectorAll(selectors.join(',')));
             if (candidateElems.length === 0) {
-                candidateElems = Array.from(document.querySelectorAll('a, button, li, div[class*="item"]'));
+                // Generic fallback must represent navigation controls. Static
+                // headings/list content are not tasks, and a substring such as
+                // "item" also matches unrelated layout classes (items-center).
+                candidateElems = Array.from(document.querySelectorAll('a[href], button, [role="tab"], [role="link"]'));
             }
             const qList = [];
             const seen = new Set();

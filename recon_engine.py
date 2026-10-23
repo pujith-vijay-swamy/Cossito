@@ -1,5 +1,5 @@
 """
-recon_engine.py — Reconnaissance pipeline for OmniTasker.
+recon_engine.py — Reconnaissance pipeline for Cossito.
 
 Extracts the reconnaissance phase logic: navigation, DOM hydration,
 problem extraction, section scanning, and task queue construction.
@@ -519,7 +519,7 @@ class ReconEngine:
             browser=browser,
             controller=controller,
             extend_system_message=get_recon_system_prompt(use_vision),
-            max_actions_per_step=3,
+            max_actions_per_step=1,
             step_timeout=120,
             register_new_step_callback=self._orch._on_agent_step,
             use_vision=use_vision,

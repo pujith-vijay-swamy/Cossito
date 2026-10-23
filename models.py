@@ -1,5 +1,5 @@
 """
-models.py — Validated contracts for OmniTasker v2.
+models.py — Validated contracts for Cossito v2.
 
 Defines structured types for tasks, observations, actions, results,
 approvals, and the overall agent state machine. All task lifecycle

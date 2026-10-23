@@ -1,5 +1,5 @@
 """
-overlay_manager.py — Browser overlay panel lifecycle for OmniTasker.
+overlay_manager.py — Browser overlay panel lifecycle for Cossito.
 
 Manages injection, state synchronization, and command polling for
 the glassmorphism overlay panel injected into target web pages.
@@ -254,7 +254,7 @@ class OverlayManager:
                     }
                     return false;
                 } catch(err) {
-                    console.error('OmniTasker overlay injection error:', err);
+                    console.error('Cossito overlay injection error:', err);
                     return false;
                 }
             }"""

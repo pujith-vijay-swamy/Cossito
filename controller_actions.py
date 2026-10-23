@@ -1,5 +1,5 @@
 """
-controller_actions.py — Browser-use controller action handlers for OmniTasker.
+controller_actions.py — Browser-use controller action handlers for Cossito.
 
 Contains all @controller.action handlers extracted from
 AgentOrchestrator._build_controller. Each action is registered on a

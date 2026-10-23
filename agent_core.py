@@ -1,5 +1,5 @@
 """
-agent_core.py — Core agent orchestration for OmniTasker.
+agent_core.py — Core agent orchestration for Cossito.
 
 Manages the two-phase flow:
   Phase 1 (Recon):  Navigate to the target URL → analyse the full page →
@@ -23,6 +23,7 @@ from pathlib import Path
 import json
 import re
 import traceback
+from urllib.parse import urlsplit, urljoin
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
@@ -275,6 +276,9 @@ class AgentOrchestrator:
         base_url: Optional[str] = None,
     ) -> None:
         self.url = url
+        self._workspace_url = url
+        self._reference_urls: set[str] = set()
+        self._workspace_lock = asyncio.Lock()
         self.api_key = api_key
         self._on_state_change = on_state_change
         self.hitl = hitl_controller or HumanInTheLoopController()
@@ -604,6 +608,7 @@ class AgentOrchestrator:
         if hasattr(self, "state") and self.state is not None:
             self.state.model_thinking = None
         self._current_task = task
+        self._reference_urls = set()
         task_label = task.platform_task.title or f"Task #{task.queue_index + 1}"
         if task.description and is_navigation_or_overview_text(task.description):
             cleaned_init = clean_extracted_problem_text(task.description)
@@ -625,6 +630,16 @@ class AgentOrchestrator:
 
         # Programmatically auto-navigate browser to the current question tab if multi-tasking
         await self._navigate_to_task_question(task, total_tasks)
+
+        # Navigation belongs to the orchestrator. Save the actual selected task
+        # location, including SPA query/fragment identity, before starting its agent.
+        browser = await self.browser_mgr.get_browser()
+        page = await self._get_current_page_safe(browser)
+        if page is not None:
+            current_url = await page.get_url()
+            if self._is_workspace_url(current_url):
+                self._workspace_url = current_url
+                task.platform_task.url = current_url
 
         # Re-extract problem description from DOM for tasks with placeholder descriptions
         is_placeholder = (
@@ -660,6 +675,25 @@ class AgentOrchestrator:
                             pass
             except Exception as e:
                 self._log(f"⚠️ Could not re-extract description for {task_label}: {e}", "warn")
+
+        self._reference_urls = {
+            urljoin(self._workspace_url, value.rstrip('.,;)'))
+            for value in re.findall(r'https?://[^\s<>"\']+', task.description or '')
+        } - {self._workspace_url}
+        if page is not None:
+            try:
+                image_urls = await page.evaluate(
+                    "() => Array.from(document.querySelectorAll('img')).map(img => img.currentSrc || img.src).filter(Boolean)"
+                )
+                if isinstance(image_urls, str):
+                    image_urls = json.loads(image_urls)
+                if isinstance(image_urls, list):
+                    self._reference_urls.update(
+                        urljoin(self._workspace_url, value) for value in image_urls if isinstance(value, str)
+                    )
+                self._reference_urls.discard(self._workspace_url)
+            except Exception as exc:
+                self._log(f"Could not collect image reference locations: {exc}", "warn")
 
         while task.budgets.has_code_repairs():
             attempt_num = len(task.submissions) + 1
@@ -950,7 +984,47 @@ class AgentOrchestrator:
                 else:
                     page = None
 
+        if page is not None and self.state.phase == AgentPhase.EXECUTING:
+            await self._restore_workspace_if_needed(page)
         return page
+
+    def _is_workspace_url(self, current_url: str) -> bool:
+        """Task scope is independent of whether an external site is safe to visit."""
+        try:
+            target, current = urlsplit(self.url), urlsplit(current_url)
+            def origin(parts):
+                return (parts.scheme.lower(), parts.hostname,
+                        parts.port or (443 if parts.scheme == 'https' else 80))
+            return (
+                origin(target) == origin(current)
+                and current.scheme in ('http', 'https')
+                and current_url not in self._reference_urls
+            )
+        except ValueError:
+            return False
+
+    async def _restore_workspace_if_needed(self, page) -> bool:
+        """Recover from asset links/redirects without adopting them as the target."""
+        if self.hitl.is_paused:
+            return False
+        async with self._workspace_lock:
+            current_url = await page.get_url()
+            if self._is_workspace_url(current_url):
+                return False
+            self._log("Reference navigation left the task workspace; restoring the selected task.", "warn")
+            await page.goto(self._workspace_url)
+            if not self._is_workspace_url(await page.get_url()):
+                raise RuntimeError("Could not restore the task workspace; refusing to edit an unrelated page.")
+        # Some platforms change questions without changing the URL. Reselect
+        # the current task after a reload, outside the lock because navigation
+        # itself obtains a guarded page.
+        task = getattr(self, '_current_task', None)
+        queue = getattr(getattr(self, 'state', None), 'task_queue', None)
+        if task is not None and queue is not None and len(queue.tasks) > 1:
+            await self._navigate_to_task_question(task, len(queue.tasks))
+            if not self._is_workspace_url(await page.get_url()):
+                raise RuntimeError("Task reselection left the workspace; refusing to continue.")
+        return True
 
     async def _hitl_gate(self, current_url: str) -> None:
         """Evaluate security gate and authentication walls, prompting user if needed."""
@@ -1093,16 +1167,33 @@ class AgentOrchestrator:
                         except Exception:
                             pass
                 
-                # Check and update active URL safely without forced page.goto redirection
+                # Keep the configured target fixed. A safe reference site is not
+                # a replacement coding workspace.
                 page = await self._get_current_page_safe(browser)
                 if page is not None:
                     await self._disable_cdp_debugger_pauses(browser, page)
                     current_url = await page.get_url()
-                    if current_url and current_url not in ("about:blank", "chrome://newtab/"):
-                        if self._is_allowed_domain(self.url, current_url):
-                            self.url = current_url  # Update tracking URL to prevent stale redirect loops
+                    if self.state.phase in (AgentPhase.RECON, AgentPhase.EXECUTING):
+                        await self._restore_workspace_if_needed(page)
+                        observed_url = getattr(browser_state, 'url', current_url)
+                        if not self._is_workspace_url(observed_url):
+                            # Element indices planned on the reference page are stale.
+                            if model_output is not None and hasattr(model_output, 'action'):
+                                model_output.action = []
             except Exception as e:
-                print(f"Exception in domain redirect safeguard: {e}")
+                if model_output is not None and hasattr(model_output, 'action'):
+                    model_output.action = []
+                raise RuntimeError(f"Task navigation safeguard failed: {e}") from e
+
+        if self.state.phase in (AgentPhase.RECON, AgentPhase.EXECUTING) and not self.hitl.is_paused:
+            for action in getattr(model_output, 'action', []) or []:
+                data = action.model_dump(exclude_none=True) if hasattr(action, 'model_dump') else action
+                if isinstance(data, dict):
+                    navigation = data.get('navigate') or data.get('go_to_url')
+                    if isinstance(navigation, dict) and not self._is_workspace_url(navigation.get('url', '')):
+                        model_output.action = []
+                        self._log("Ignored reference URL navigation; continue coding in the task workspace.", "warn")
+                        break
 
         # Intercept mid-run skip suggestions from overlay
         if self.control_flags and self.control_flags.get("suggestions"):

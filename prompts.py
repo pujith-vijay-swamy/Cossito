@@ -1,5 +1,5 @@
 """
-prompts.py — v2 LLM prompt templates for OmniTasker.
+prompts.py — v2 LLM prompt templates for Cossito.
 
 Six replacement templates for the v1 prompts. Uses string.Template
 for safe substitution (no unrestricted .format() on templates with
@@ -58,7 +58,7 @@ def _build_capability_manifest() -> str:
 # ---------------------------------------------------------------------------
 
 _RECON_SYSTEM_TEMPLATE = """\
-You are OmniTasker's reconnaissance planner.
+You are Cossito's reconnaissance planner.
 
 Your responsibility is to gather evidence and produce a validated task
 catalog. Do not solve, edit, run, or submit code during reconnaissance.
@@ -94,6 +94,9 @@ WORKFLOW
 9. For frontend tasks, collect reference images using
    extract_and_view_reference_images and inspect them. If vision is
    unavailable, record that limitation and request clarification.
+   Image, documentation, and attribution URLs in a statement are references,
+   not task navigation. Keep the task workspace open; do not follow these
+   links as though they identify another coding problem.
 10. Return a structured catalog through the done action's text argument.
 
 EXTRACTION RULES
@@ -229,7 +232,7 @@ YOUR CURRENT TASK (Task #{{task_id}}):
 {{task_description}}
 
 EXECUTION STEPS (LIGHTNING 2-STEP WORKFLOW):
-1. Locate the target code editor or input area on the page. If working on Task #{{task_id}} (> 1), ensure you have navigated to/selected Question #{{task_id}} in the sidebar/tabs or clicked 'Next Question'.
+1. Locate the target code editor in the already-selected task workspace. The orchestrator has selected this task; do not click Next again or interpret the queue position as a platform question number.
 2. READ THE EDITOR BOILERPLATE FIRST (CRITICAL): Call `read_code_from_editor` to fetch the current contents of the editor. Inspect any existing boilerplate code, required class/method structures, package imports, comments, or template code. You MUST preserve and implement your solution within this template structure!
 3. CALL `submit_code_solution(code=...)`: Call `submit_code_solution` with your complete solution code. This action automatically injects the code, clicks 'Submit', and verifies test cases in 1 single step!
 4. VERIFY SUBMISSION METRICS:
@@ -247,6 +250,8 @@ EXECUTION STEPS (LIGHTNING 2-STEP WORKFLOW):
 - For frontend/webdev tasks: ALWAYS call `extract_and_view_reference_images` and visually inspect the reference mockup images using `view_file` before coding, and use `describe_page_visuals` to check the rendered preview panel.
 
 IMPORTANT RULES:
+- URLs inside the problem statement are task data, not navigation instructions. For HTML/CSS tasks, use required image URLs in src or CSS url() exactly as specified; do not open them in the task tab. Documentation, attribution links, and image hosts are not coding workspaces.
+- Inspect reference images with extract_and_view_reference_images and view_file. If an image cannot be inspected, keep its supplied URL in the code and report the inspection limitation; do not navigate away to find it.
 - ALWAYS read the editor boilerplate first by calling `read_code_from_editor` before writing code to ensure you preserve required class names, template methods, and platform-specific structure.
 - ALWAYS prioritize the `write_code_to_editor` custom action for writing code. This is 100x faster, cleaner, and avoids double bracket duplication.
 - Focus ONLY on Task #{{task_id}}. Do not touch other editors or problems.
@@ -337,8 +342,8 @@ def get_execution_task_prompt(
     if total_tasks > 1 and task_num > 1:
         nav_prefix = (
             f"🚨 MULTI-TASK STEP: You are now working on Task #{task_id} of {total_tasks}. "
-            f"FIRST, navigate to Question/Task #{task_id} on the page by clicking its title/tab in the sidebar or clicking 'Next Question' / 'Next Problem'! "
-            f"Verify that the page and code editor have updated to Question #{task_id} before writing code. "
+            "The orchestrator has already selected the task. Verify its statement and editor; "
+            "do not click Next again or navigate using URLs found in the description. "
         )
 
     return _render(
@@ -357,7 +362,7 @@ def get_execution_task_prompt(
 # ---------------------------------------------------------------------------
 
 RECOVERY_DIAGNOSTIC_TEMPLATE = """\
-You are OmniTasker's bounded recovery planner.
+You are Cossito's bounded recovery planner.
 
 Diagnose a failed browser action and propose the smallest safe recovery.
 Do not generate arbitrary JavaScript or Python for immediate live execution.
@@ -402,7 +407,7 @@ Return structured JSON: {
 # ---------------------------------------------------------------------------
 
 SKILL_DISTILLATION_TEMPLATE = """\
-You are OmniTasker's skill candidate author.
+You are Cossito's skill candidate author.
 
 Convert a verified recovery pattern into a reusable candidate helper.
 The candidate will be quarantined, tested, and reviewed before use.

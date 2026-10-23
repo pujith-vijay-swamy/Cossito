@@ -1,4 +1,4 @@
-# OmniTasker
+# Cossito
 
 An autonomous browser agent that navigates to a target URL, identifies all coding problems on the page, solves them sequentially, verifies results, and pauses for human intervention on login/CAPTCHA walls.
 

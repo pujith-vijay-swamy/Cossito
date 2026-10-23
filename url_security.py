@@ -1,5 +1,5 @@
 """
-url_security.py — Two-Layer Security Gate for OmniTasker (Phase 2).
+url_security.py — Two-Layer Security Gate for Cossito (Phase 2).
 
 Implements:
 1. Layer 1 (Denylist): Enforces automated blocking of prohibited domains/patterns.

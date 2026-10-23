@@ -1,5 +1,5 @@
 """
-task_subagent.py — Subagent & Context Window Isolation for OmniTasker (Phase 1).
+task_subagent.py — Subagent & Context Window Isolation for Cossito (Phase 1).
 
 Executes each individual CodingTask in an isolated subagent context container:
 - Sandboxed prompt scope and step budget.
@@ -154,6 +154,11 @@ class TaskSubagent:
             task.expected_behavior,
             total_tasks=total_tasks,
         )
+        exec_task += (
+            f"\nTask workspace: {task.platform_task.url or orch.url}\n"
+            "Stay in this workspace. URLs in the statement are reference assets or "
+            "requirements for the generated code, not destinations for the browser."
+        )
 
         # 4. Instantiate isolated browser-use Agent
         agent = Agent(
@@ -162,7 +167,9 @@ class TaskSubagent:
             browser=browser,
             controller=controller,
             extend_system_message=exec_sys,
-            max_actions_per_step=5,
+            # Recheck workspace scope between actions, including clicks that
+            # unexpectedly open a reference or redirect the current tab.
+            max_actions_per_step=1,
             step_timeout=3600,
             register_new_step_callback=orch._on_agent_step,
             use_vision=orch.use_vision,

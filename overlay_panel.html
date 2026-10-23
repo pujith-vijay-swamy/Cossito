@@ -1,4 +1,4 @@
-<!-- OmniTasker Overlay Panel — Self-Contained HTML Component -->
+<!-- Cossito Overlay Panel — Self-Contained HTML Component -->
 <!-- Injected into target webpage DOM via Playwright page.evaluate() -->
 <!-- All CSS is scoped. All JS runs inside an IIFE. Zero global pollution. -->
 
@@ -7,9 +7,9 @@
 <div id="__omnitasker_commands" style="display:none !important;position:absolute !important;pointer-events:none !important;width:0 !important;height:0 !important;overflow:hidden !important;" data-action="" data-payload=""></div>
 
 <!-- Main overlay panel -->
-<div id="__omnitasker_panel" style="position:fixed !important;bottom:20px !important;right:20px !important;width:380px !important;box-sizing:border-box !important;z-index:2147483647 !important;font-family:'Plus Jakarta Sans',-apple-system,sans-serif !important;font-size:13px !important;line-height:1.5 !important;color:#ffffff !important;background:#18181b !important;border-radius:16px !important;overflow:hidden !important;user-select:none !important;display:flex !important;flex-direction:column !important;cursor:default !important;">
+<div id="__omnitasker_panel" style="position:fixed !important;bottom:20px !important;right:20px !important;width:380px !important;box-sizing:border-box !important;z-index:2147483647 !important;font-family:'Space Grotesk',-apple-system,sans-serif !important;font-size:13px !important;line-height:1.5 !important;color:#fffbed !important;background:#202027 !important;border-radius:16px !important;overflow:hidden !important;user-select:none !important;display:flex !important;flex-direction:column !important;cursor:default !important;">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 #__omnitasker_panel {
   position: fixed !important;
@@ -18,14 +18,14 @@
   width: 380px !important;
   box-sizing: border-box !important;
   z-index: 2147483647 !important;
-  font-family: 'Plus Jakarta Sans', -apple-system, sans-serif !important;
+  font-family: 'Space Grotesk', -apple-system, sans-serif !important;
   font-size: 13px !important;
   line-height: 1.5 !important;
-  color: #ffffff !important;
-  background: #18181b !important;
-  border: 3.5px solid #a855f7 !important;
+  color: #fffbed !important;
+  background: #202027 !important;
+  border: 1px solid #e9ff69 !important;
   border-radius: 16px !important;
-  box-shadow: 6px 6px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   overflow: hidden !important;
   user-select: none !important;
   display: flex !important;
@@ -45,57 +45,57 @@
   gap: 10px !important;
   padding: 12px 16px !important;
   cursor: grab !important;
-  background: #27272a !important;
-  border-bottom: 3.5px solid #000000 !important;
+  background: #554b62 !important;
+  border-bottom: 1px solid #554b62 !important;
   min-height: 48px !important;
 }
 #__omnitasker_panel .__ot_titlebar:active { cursor: grabbing !important; }
 
 #__omnitasker_panel .__ot_logo {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 16px !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
   letter-spacing: 0.02em !important;
-  color: #ffffff !important;
-  text-transform: uppercase !important;
+  color: #fffbed !important;
+  text-transform: none !important;
   margin: 0 !important;
   flex-shrink: 0 !important;
-  text-shadow: 1.5px 1.5px 0px #000000 !important;
+  text-shadow: none !important;
 }
 #__omnitasker_panel .__ot_orb {
   width: 10px !important;
   height: 10px !important;
   border-radius: 50% !important;
   flex-shrink: 0 !important;
-  border: 1.5px solid #000000 !important;
-  background: #71717a !important;
+  border: 1.5px solid #554b62 !important;
+  background: #ada2ba !important;
   transition: background 0.3s !important;
 }
-#__omnitasker_panel .__ot_orb.--recon   { background: #38bdf8 !important; }
-#__omnitasker_panel .__ot_orb.--exec    { background: #4ade80 !important; }
-#__omnitasker_panel .__ot_orb.--paused  { background: #f43f5e !important; }
-#__omnitasker_panel .__ot_orb.--done    { background: #a855f7 !important; }
-#__omnitasker_panel .__ot_orb.--error   { background: #f43f5e !important; }
+#__omnitasker_panel .__ot_orb.--recon   { background: #94d5ff !important; }
+#__omnitasker_panel .__ot_orb.--exec    { background: #e9ff69 !important; }
+#__omnitasker_panel .__ot_orb.--paused  { background: #ff8b98 !important; }
+#__omnitasker_panel .__ot_orb.--done    { background: #e9ff69 !important; }
+#__omnitasker_panel .__ot_orb.--error   { background: #ff8b98 !important; }
 
 #__omnitasker_panel .__ot_phase_pill {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 10px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
   letter-spacing: 0.06em !important;
   padding: 4px 10px !important;
   border-radius: 8px !important;
-  background: #09090b !important;
-  color: #a1a1aa !important;
-  border: 2px solid #000000 !important;
-  box-shadow: 2px 2px 0px #000000 !important;
+  background: #101014 !important;
+  color: #b9b6c5 !important;
+  border: 1px solid #554b62 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   white-space: nowrap !important;
 }
-#__omnitasker_panel .__ot_phase_pill.--recon   { background: #38bdf8 !important; color: #000000 !important; }
-#__omnitasker_panel .__ot_phase_pill.--exec    { background: #4ade80 !important; color: #000000 !important; }
-#__omnitasker_panel .__ot_phase_pill.--paused  { background: #f43f5e !important; color: #ffffff !important; }
-#__omnitasker_panel .__ot_phase_pill.--done    { background: #a855f7 !important; color: #000000 !important; }
-#__omnitasker_panel .__ot_phase_pill.--error   { background: #f43f5e !important; color: #ffffff !important; }
+#__omnitasker_panel .__ot_phase_pill.--recon   { background: #94d5ff !important; color: #000000 !important; }
+#__omnitasker_panel .__ot_phase_pill.--exec    { background: #e9ff69 !important; color: #000000 !important; }
+#__omnitasker_panel .__ot_phase_pill.--paused  { background: #ff8b98 !important; color: #fffbed !important; }
+#__omnitasker_panel .__ot_phase_pill.--done    { background: #e9ff69 !important; color: #000000 !important; }
+#__omnitasker_panel .__ot_phase_pill.--error   { background: #ff8b98 !important; color: #fffbed !important; }
 
 #__omnitasker_panel .__ot_spacer { flex: 1 !important; }
 
@@ -103,22 +103,22 @@
   width: 28px !important;
   height: 28px !important;
   border-radius: 8px !important;
-  background: #09090b !important;
-  color: #ffffff !important;
+  background: #101014 !important;
+  color: #fffbed !important;
   font-size: 16px !important;
-  font-weight: 900 !important;
+  font-weight: 700 !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  border: 2px solid #000000 !important;
-  box-shadow: 2px 2px 0px #000000 !important;
+  border: 1px solid #554b62 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   transition: transform 0.1s ease !important;
   padding: 0 !important;
   line-height: 1 !important;
   flex-shrink: 0 !important;
 }
-#__omnitasker_panel .__ot_collapse_btn:active { transform: translate(1px, 1px) !important; box-shadow: 1px 1px 0px #000 !important; }
+#__omnitasker_panel .__ot_collapse_btn:active { transform: translateY(-1px) !important; box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important; }
 
 /* ── Body ── */
 #__omnitasker_panel .__ot_body {
@@ -129,34 +129,34 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 12px !important;
-  background: #09090b !important;
+  background: #101014 !important;
 }
 #__omnitasker_panel .__ot_body::-webkit-scrollbar { width: 6px !important; }
-#__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb { background: #27272a !important; border-radius: 3px !important; }
+#__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb { background: #554b62 !important; border-radius: 3px !important; }
 
 /* ── Progress Bar ── */
 #__omnitasker_panel .__ot_progress_wrap { display: none !important; }
 #__omnitasker_panel .__ot_progress_wrap.--visible { display: block !important; }
 #__omnitasker_panel .__ot_progress_track {
   height: 12px !important;
-  background: #18181b !important;
+  background: #202027 !important;
   border-radius: 8px !important;
   overflow: hidden !important;
-  border: 2.5px solid #000000 !important;
-  box-shadow: 2px 2px 0px #000000 !important;
+  border: 1px solid #554b62 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_progress_fill {
   height: 100% !important;
-  background: linear-gradient(90deg, #38bdf8, #a855f7, #4ade80) !important;
-  border-right: 2px solid #000000 !important;
+  background: linear-gradient(90deg, #94d5ff, #e9ff69, #e9ff69) !important;
+  border-right: 1px solid #554b62 !important;
   transition: width 0.4s ease !important;
-  width: 0% !important;
+  width: 0%;
 }
 #__omnitasker_panel .__ot_progress_label {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 10px !important;
   font-weight: 700 !important;
-  color: #a1a1aa !important;
+  color: #b9b6c5 !important;
   text-align: right !important;
   margin-top: 4px !important;
 }
@@ -165,25 +165,25 @@
 #__omnitasker_panel .__ot_hitl { display: none !important; }
 #__omnitasker_panel .__ot_hitl.--visible {
   display: block !important;
-  background: #18181b !important;
-  border: 3px solid #f43f5e !important;
+  background: #202027 !important;
+  border: 1px solid #ff8b98 !important;
   border-radius: 12px !important;
   padding: 12px 14px !important;
   text-align: center !important;
-  box-shadow: 4px 4px 0px #f43f5e !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_hitl_title {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 13px !important;
-  font-weight: 900 !important;
-  color: #f43f5e !important;
-  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  color: #ff8b98 !important;
+  text-transform: none !important;
   letter-spacing: 0.05em !important;
   margin-bottom: 4px !important;
 }
 #__omnitasker_panel .__ot_hitl_reason {
   font-size: 11.5px !important;
-  color: #d4d4d8 !important;
+  color: #d8d2e2 !important;
   font-weight: 500 !important;
 }
 
@@ -191,42 +191,42 @@
 #__omnitasker_panel .__ot_cog { display: none !important; }
 #__omnitasker_panel .__ot_cog.--visible {
   display: block !important;
-  background: #18181b !important;
-  border: 2.5px solid #27272a !important;
+  background: #202027 !important;
+  border: 1px solid #554b62 !important;
   border-radius: 12px !important;
   padding: 10px 13px !important;
-  box-shadow: 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_cog_label {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 10px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
   letter-spacing: 0.07em !important;
   margin-bottom: 5px !important;
   display: flex !important;
   align-items: center !important;
   gap: 5px !important;
 }
-#__omnitasker_panel .__ot_cog_label.--cyan   { color: #38bdf8 !important; }
-#__omnitasker_panel .__ot_cog_label.--green  { color: #4ade80 !important; }
-#__omnitasker_panel .__ot_cog_label.--purple { color: #c084fc !important; }
-#__omnitasker_panel .__ot_cog_label.--orange { color: #facc15 !important; }
+#__omnitasker_panel .__ot_cog_label.--cyan   { color: #94d5ff !important; }
+#__omnitasker_panel .__ot_cog_label.--green  { color: #e9ff69 !important; }
+#__omnitasker_panel .__ot_cog_label.--purple { color: #c1a0ff !important; }
+#__omnitasker_panel .__ot_cog_label.--orange { color: #ffb078 !important; }
 
 #__omnitasker_panel .__ot_cog_text {
   font-size: 12px !important;
-  color: #ffffff !important;
+  color: #fffbed !important;
   font-weight: 500 !important;
   word-break: break-word !important;
 }
 #__omnitasker_panel .__ot_cog_mono {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 11px !important;
-  color: #38bdf8 !important;
-  background: #09090b !important;
+  color: #94d5ff !important;
+  background: #101014 !important;
   padding: 8px 10px !important;
   border-radius: 8px !important;
-  border: 2px solid #27272a !important;
+  border: 1px solid #554b62 !important;
   max-height: 60px !important;
   overflow-y: auto !important;
   white-space: pre-wrap !important;
@@ -243,9 +243,9 @@
   font-weight: 700 !important;
   padding: 3px 8px !important;
   border-radius: 6px !important;
-  background: #27272a !important;
-  border: 2px solid #000000 !important;
-  color: #38bdf8 !important;
+  background: #554b62 !important;
+  border: 1px solid #554b62 !important;
+  color: #94d5ff !important;
   white-space: nowrap !important;
 }
 
@@ -253,12 +253,12 @@
 #__omnitasker_panel .__ot_tasks_section { display: none !important; }
 #__omnitasker_panel .__ot_tasks_section.--visible { display: block !important; }
 #__omnitasker_panel .__ot_tasks_header {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 10px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
   letter-spacing: 0.07em !important;
-  color: #a1a1aa !important;
+  color: #b9b6c5 !important;
   margin-bottom: 6px !important;
 }
 #__omnitasker_panel .__ot_tasks_list {
@@ -276,13 +276,13 @@
   border-radius: 8px !important;
   font-size: 11.5px !important;
   font-weight: 600 !important;
-  color: #ffffff !important;
-  background: #18181b !important;
-  border: 2px solid #27272a !important;
+  color: #fffbed !important;
+  background: #202027 !important;
+  border: 1px solid #554b62 !important;
 }
 #__omnitasker_panel .__ot_task_row.--current {
-  border-color: #a855f7 !important;
-  box-shadow: 2px 2px 0px #a855f7 !important;
+  border-color: #e9ff69 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_task_icon { flex-shrink: 0 !important; font-size: 13px !important; }
 #__omnitasker_panel .__ot_task_desc {
@@ -297,8 +297,8 @@
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  background: #27272a !important;
-  border: 2.5px solid #000000 !important;
+  background: #554b62 !important;
+  border: 1px solid #554b62 !important;
   border-bottom: none !important;
   border-radius: 8px 8px 0 0 !important;
   padding: 6px 12px !important;
@@ -306,10 +306,10 @@
 #__omnitasker_panel .__ot_logs_title {
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 9px !important;
-  font-weight: 800 !important;
-  color: #ffffff !important;
+  font-weight: 600 !important;
+  color: #fffbed !important;
   letter-spacing: 0.1em !important;
-  text-transform: uppercase !important;
+  text-transform: none !important;
 }
 #__omnitasker_panel .__ot_dots { display: flex !important; gap: 4px !important; }
 #__omnitasker_panel .__ot_dot {
@@ -318,13 +318,13 @@
   border-radius: 50% !important;
   border: 1.5px solid #000 !important;
 }
-#__omnitasker_panel .__ot_dot.--r { background: #f43f5e !important; }
-#__omnitasker_panel .__ot_dot.--y { background: #facc15 !important; }
-#__omnitasker_panel .__ot_dot.--g { background: #4ade80 !important; }
+#__omnitasker_panel .__ot_dot.--r { background: #ff8b98 !important; }
+#__omnitasker_panel .__ot_dot.--y { background: #ffb078 !important; }
+#__omnitasker_panel .__ot_dot.--g { background: #e9ff69 !important; }
 
 #__omnitasker_panel .__ot_logs_box {
-  background: #09090b !important;
-  border: 2.5px solid #000000 !important;
+  background: #101014 !important;
+  border: 1px solid #554b62 !important;
   border-radius: 0 0 8px 8px !important;
   padding: 8px 10px !important;
   max-height: 130px !important;
@@ -332,7 +332,7 @@
   font-family: 'JetBrains Mono', monospace !important;
   font-size: 11px !important;
   line-height: 1.55 !important;
-  box-shadow: 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar,
 #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar,
@@ -343,32 +343,32 @@
 #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar-track,
 #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar-track,
 #__omnitasker_panel .__ot_body::-webkit-scrollbar-track {
-  background: #09090b !important;
+  background: #101014 !important;
   border-radius: 4px !important;
 }
 #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar-thumb,
 #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar-thumb,
 #__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb {
-  background: #a855f7 !important;
+  background: #e9ff69 !important;
   border-radius: 4px !important;
-  border: 1px solid #000000 !important;
+  border: 1px solid #554b62 !important;
 }
 #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar-thumb:hover,
 #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar-thumb:hover,
 #__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb:hover {
-  background: #c084fc !important;
+  background: #c1a0ff !important;
 }
 #__omnitasker_panel .__ot_log_line {
   padding: 2px 0 !important;
-  border-bottom: 1px solid #18181b !important;
+  border-bottom: 1px solid #202027 !important;
   word-break: break-word !important;
   display: block !important;
 }
-#__omnitasker_panel .__ot_log_ts  { color: #71717a !important; font-size: 10px !important; margin-right: 6px !important; }
-#__omnitasker_panel .__ot_log_msg { color: #38bdf8 !important; }
-#__omnitasker_panel .__ot_log_msg.--success { color: #4ade80 !important; font-weight: 700 !important; }
-#__omnitasker_panel .__ot_log_msg.--warn    { color: #facc15 !important; font-weight: 700 !important; }
-#__omnitasker_panel .__ot_log_msg.--error   { color: #f43f5e !important; font-weight: 700 !important; }
+#__omnitasker_panel .__ot_log_ts  { color: #ada2ba !important; font-size: 10px !important; margin-right: 6px !important; }
+#__omnitasker_panel .__ot_log_msg { color: #94d5ff !important; }
+#__omnitasker_panel .__ot_log_msg.--success { color: #e9ff69 !important; font-weight: 700 !important; }
+#__omnitasker_panel .__ot_log_msg.--warn    { color: #ffb078 !important; font-weight: 700 !important; }
+#__omnitasker_panel .__ot_log_msg.--error   { color: #ff8b98 !important; font-weight: 700 !important; }
 
 /* ── Suggestion ── */
 #__omnitasker_panel .__ot_suggest_wrap {
@@ -377,35 +377,35 @@
 }
 #__omnitasker_panel .__ot_suggest_input {
   flex: 1 !important;
-  background: #18181b !important;
-  border: 2.5px solid #27272a !important;
+  background: #202027 !important;
+  border: 1px solid #554b62 !important;
   border-radius: 10px !important;
   padding: 7px 10px !important;
   font-size: 11.5px !important;
-  color: #ffffff !important;
+  color: #fffbed !important;
   font-weight: 600 !important;
   outline: none !important;
   resize: none !important;
   min-height: 36px !important;
   max-height: 36px !important;
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  box-shadow: 2px 2px 0px #000000 !important;
+  font-family: 'Space Grotesk', sans-serif !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
-#__omnitasker_panel .__ot_suggest_input:focus { border-color: #a855f7 !important; }
-#__omnitasker_panel .__ot_suggest_input::placeholder { color: #71717a !important; }
+#__omnitasker_panel .__ot_suggest_input:focus { border-color: #e9ff69 !important; }
+#__omnitasker_panel .__ot_suggest_input::placeholder { color: #ada2ba !important; }
 
 /* ── Buttons (Neo-Brutalist) ── */
 #__omnitasker_panel .__ot_btn {
   padding: 8px 14px !important;
   border-radius: 10px !important;
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 11.5px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
   letter-spacing: 0.04em !important;
   cursor: pointer !important;
-  border: 2.5px solid #000000 !important;
-  box-shadow: 3px 3px 0px #000000 !important;
+  border: 1px solid #554b62 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   transition: transform 0.1s ease, box-shadow 0.1s ease !important;
   white-space: nowrap !important;
   display: inline-flex !important;
@@ -415,28 +415,28 @@
   text-align: center !important;
 }
 #__omnitasker_panel .__ot_btn:active {
-  transform: translate(1.5px, 1.5px) !important;
-  box-shadow: 1.5px 1.5px 0px #000000 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_btn.--send {
-  background: #a855f7 !important;
+  background: #e9ff69 !important;
   color: #000000 !important;
   flex-shrink: 0 !important;
 }
 #__omnitasker_panel .__ot_btn.--pause {
   flex: 1 !important;
-  background: #facc15 !important;
+  background: #ffb078 !important;
   color: #000000 !important;
 }
 #__omnitasker_panel .__ot_btn.--resume {
   flex: 1 !important;
-  background: #4ade80 !important;
+  background: #e9ff69 !important;
   color: #000000 !important;
 }
 #__omnitasker_panel .__ot_btn.--stop {
   flex: 1 !important;
-  background: #f43f5e !important;
-  color: #ffffff !important;
+  background: #ff8b98 !important;
+  color: #fffbed !important;
 }
 
 /* ── Controls Row Spacing ── */
@@ -455,11 +455,11 @@
 #__omnitasker_panel .__ot_failed { display: none !important; }
 #__omnitasker_panel .__ot_failed.--visible {
   display: block !important;
-  background: #18181b !important;
-  border: 2.5px solid #f59e0b !important;
+  background: #202027 !important;
+  border: 1px solid #ffb078 !important;
   border-radius: 12px !important;
   padding: 10px 12px !important;
-  box-shadow: 3px 3px 0px #f59e0b !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel .__ot_failed_header {
   display: flex !important;
@@ -468,17 +468,17 @@
   margin-bottom: 6px !important;
 }
 #__omnitasker_panel .__ot_failed_title {
-  font-family: 'Outfit', sans-serif !important;
+  font-family: 'Space Grotesk', sans-serif !important;
   font-size: 10px !important;
-  font-weight: 900 !important;
-  text-transform: uppercase !important;
-  color: #f59e0b !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  color: #ffb078 !important;
   letter-spacing: 0.05em !important;
 }
 #__omnitasker_panel .__ot_btn.--copy {
   font-size: 10px !important;
   padding: 4px 10px !important;
-  background: #f59e0b !important;
+  background: #ffb078 !important;
   color: #000000 !important;
   border-radius: 6px !important;
 }
@@ -488,7 +488,7 @@
 /* ── Empty state ── */
 #__omnitasker_panel .__ot_empty {
   text-align: center !important;
-  color: #71717a !important;
+  color: #ada2ba !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   padding: 16px 8px !important;
@@ -507,9 +507,9 @@
   overflow: hidden !important;
   padding: 0 !important;
   margin: 0 !important;
-  background: #18181b !important;
-  border: 3.5px solid #a855f7 !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), 3px 3px 0px #000000 !important;
+  background: #202027 !important;
+  border: 1px solid #e9ff69 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   cursor: pointer !important;
   display: flex !important;
   align-items: center !important;
@@ -519,53 +519,53 @@
 
 #__omnitasker_panel.__ot_collapsed_ball:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.4), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
   transition: transform 0.15s ease, box-shadow 0.15s ease !important;
 }
 
 /* Phase-specific border accents for collapsed ball */
 #__omnitasker_panel.__ot_collapsed_ball.--phase-recon {
-  border-color: #38bdf8 !important;
-  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4), 3px 3px 0px #000000 !important;
+  border-color: #94d5ff !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-exec {
-  border-color: #4ade80 !important;
-  box-shadow: 0 4px 14px rgba(74, 222, 128, 0.4), 3px 3px 0px #000000 !important;
+  border-color: #e9ff69 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-paused {
-  border-color: #f43f5e !important;
+  border-color: #ff8b98 !important;
   animation: __ot_pulse_attention 1.1s infinite alternate !important;
-  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.5), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-error {
-  border-color: #ef4444 !important;
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.5), 3px 3px 0px #000000 !important;
+  border-color: #ff8b98 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-done {
-  border-color: #a855f7 !important;
-  box-shadow: 0 4px 14px rgba(168, 85, 247, 0.4), 3px 3px 0px #000000 !important;
+  border-color: #e9ff69 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 
 #__omnitasker_panel.__ot_collapsed_ball.--phase-recon:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 6px 20px rgba(56, 189, 248, 0.6), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-exec:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 6px 20px rgba(74, 222, 128, 0.6), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-done:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 6px 20px rgba(168, 85, 247, 0.6), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 #__omnitasker_panel.__ot_collapsed_ball.--phase-error:hover {
   transform: scale(1.08) !important;
-  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6), 3px 3px 0px #000000 !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 
 @keyframes __ot_pulse_attention {
-  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.6), 3px 3px 0px #000000; }
-  100% { transform: scale(1.12); box-shadow: 0 0 0 10px rgba(244, 63, 94, 0), 3px 3px 0px #000000; }
+  0% { transform: scale(1); box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important; }
+  100% { transform: scale(1.12); box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important; }
 }
 
 #__omnitasker_panel.__ot_collapsed_ball .__ot_body {
@@ -600,12 +600,12 @@
   padding: 0 !important;
   border-radius: 14px !important;
   background: transparent !important;
-  color: #ffffff !important;
+  color: #fffbed !important;
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
   border: none !important;
-  box-shadow: none !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
 
 #__omnitasker_panel .__ot_icon_expand {
@@ -651,13 +651,58 @@
 /* ── Glowing Completion Bar ── */
 #__omnitasker_panel .__ot_progress_fill.--done {
   background: linear-gradient(90deg, #10b981, #059669, #34d399) !important;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.5) !important;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .16) !important;
 }
+/* Cossito kinetic companion — all styles scoped to the overlay. */
+#__omnitasker_panel { color-scheme: dark !important; max-width: calc(100vw - 40px) !important; max-height: calc(100dvh - 40px) !important; border: 2px solid #fffbed !important; border-radius: 10px !important; box-shadow: 6px 6px 0 #050507, 0 16px 45px #00000055 !important; }
+#__omnitasker_panel .__ot_titlebar { background: linear-gradient(110deg, #ffb078, #ff855e 55%, #f278b4) !important; border-bottom: 2px solid #050507 !important; padding: 12px 16px !important; gap: 9px !important; }
+#__omnitasker_panel .__ot_logo { font-family: 'Anton', 'Impact', sans-serif !important; font-size: 24px !important; font-weight: 400 !important; letter-spacing: -.025em !important; color: #17131d !important; text-transform: uppercase !important; text-shadow: 1px 1px 0 #fffbed !important; }
+#__omnitasker_panel .__ot_orb { width: 7px !important; height: 7px !important; border: 1px solid #17131d !important; }
+#__omnitasker_panel .__ot_phase_pill { padding: 3px 8px !important; border: 1px solid #17131d !important; border-radius: 4px !important; box-shadow: 2px 2px 0 #17131d !important; font-weight: 700 !important; letter-spacing: .02em !important; color: #fffbed !important; background: #302b37 !important; }
+#__omnitasker_panel .__ot_phase_pill.--exec { background: #e9ff69 !important; color: #242e0b !important; }
+#__omnitasker_panel .__ot_phase_pill.--done { background: #c1a0ff !important; color: #21162f !important; }
+#__omnitasker_panel .__ot_phase_pill.--recon { background: #94d5ff !important; color: #142b3b !important; }
+#__omnitasker_panel .__ot_phase_pill.--paused { background: #ffb078 !important; color: #361d0c !important; }
+#__omnitasker_panel .__ot_phase_pill.--error { background: #ff8b98 !important; color: #39151c !important; }
+#__omnitasker_panel .__ot_collapse_btn { border: 1px solid #17131d !important; background: #fffbed !important; color: #17131d !important; border-radius: 4px !important; box-shadow: 2px 2px 0 #17131d !important; }
+#__omnitasker_panel .__ot_body { background: #17171d !important; padding: 16px !important; gap: 14px !important; min-height: 0 !important; }
+#__omnitasker_panel .__ot_cog.--visible { background: #202027 !important; border: 1px solid #635a70 !important; border-radius: 7px !important; padding: 12px 13px !important; box-shadow: 3px 3px 0 #050507 !important; transition: border-color .2s ease !important; }
+#__omnitasker_panel .__ot_cog.--visible:hover { border-color: #c1a0ff !important; }
+#__omnitasker_panel .__ot_cog_text { font-size: 12px !important; line-height: 1.7 !important; font-weight: 400 !important; color: #eee7f3 !important; }
+#__omnitasker_panel .__ot_cog_label { font-size: 10px !important; font-weight: 700 !important; letter-spacing: .025em !important; }
+#__omnitasker_panel .__ot_cog_mono { color: #cfc0ef !important; background: #131117 !important; border-color: #5e566b !important; }
+#__omnitasker_panel .__ot_task_row { background: #202027 !important; border: 1px solid #635a70 !important; border-radius: 5px !important; padding: 8px 10px !important; font-weight: 400 !important; }
+#__omnitasker_panel .__ot_task_row.--current { border-color: #e9ff69 !important; background: #e9ff690c !important; box-shadow: 2px 2px 0 #050507 !important; }
+#__omnitasker_panel .__ot_progress_track { height: 9px !important; border: 1px solid #635a70 !important; border-radius: 3px !important; background: #28222f !important; box-shadow: 2px 2px 0 #050507 !important; }
+#__omnitasker_panel .__ot_progress_fill { border: none !important; background: repeating-linear-gradient(115deg, #e9ff69 0 16px, #bbd344 16px 24px) !important; background-size: 53px 100% !important; animation: __ot_cinema_flow 2s linear infinite !important; }
+#__omnitasker_panel .__ot_logs_bar { background: #c1a0ff !important; border: 1px solid #050507 !important; border-bottom: none !important; border-radius: 5px 5px 0 0 !important; padding: 8px 10px !important; }
+#__omnitasker_panel .__ot_logs_title { color: #241535 !important; font-weight: 700 !important; letter-spacing: .06em !important; }
+#__omnitasker_panel .__ot_logs_box { background: #131117 !important; border: 1px solid #5e566b !important; border-top: 0 !important; border-radius: 0 0 5px 5px !important; box-shadow: 3px 3px 0 #050507 !important; }
+#__omnitasker_panel .__ot_dot { width: 6px !important; height: 6px !important; border: 1px solid #241535 !important; }
+#__omnitasker_panel .__ot_log_line { padding: 5px 0 !important; border-color: #3b3345 !important; }
+#__omnitasker_panel .__ot_suggest_input { background: #101014 !important; border: 1px solid #635a70 !important; border-radius: 5px !important; box-shadow: 2px 2px 0 #050507 !important; min-width: 0 !important; font-weight: 400 !important; }
+#__omnitasker_panel .__ot_suggest_input:focus { border-color: #c1a0ff !important; box-shadow: 2px 2px 0 #c1a0ff !important; }
+#__omnitasker_panel .__ot_btn { border: 1px solid #050507 !important; border-radius: 5px !important; font-weight: 700 !important; letter-spacing: 0 !important; min-height: 36px !important; box-shadow: 3px 3px 0 #050507 !important; transition: transform .16s ease, box-shadow .16s ease !important; }
+#__omnitasker_panel .__ot_btn:hover { transform: translate(-1px,-2px) rotate(-1deg) !important; box-shadow: 4px 5px 0 #050507 !important; }
+#__omnitasker_panel .__ot_btn:active { transform: translate(2px,2px) !important; box-shadow: 1px 1px 0 #050507 !important; }
+#__omnitasker_panel .__ot_btn.--send, #__omnitasker_panel .__ot_btn.--resume { background: #e9ff69 !important; color: #242e0b !important; }
+#__omnitasker_panel .__ot_btn.--pause { background: #ffb078 !important; color: #361d0c !important; }
+#__omnitasker_panel .__ot_btn.--stop { background: #ff8b98 !important; color: #39151c !important; }
+#__omnitasker_panel button:focus-visible { outline: 2px solid #fffbed !important; outline-offset: 3px !important; }
+#__omnitasker_panel .__ot_hitl.--visible, #__omnitasker_panel .__ot_failed.--visible { background: #2e211f !important; border: 1px solid #ffb078 !important; box-shadow: 3px 3px 0 #050507 !important; }
+#__omnitasker_panel .__ot_hitl_title { color: #ffb078 !important; }
+#__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb, #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar-thumb, #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar-thumb { background: #736182 !important; border: none !important; }
+#__omnitasker_panel.__ot_collapsed_ball { border: 2px solid #e9ff69 !important; box-shadow: 4px 4px 0 #050507 !important; border-radius: 9px !important; }
+#__omnitasker_panel.__ot_collapsed_ball .__ot_collapse_btn { border: none !important; color: #e9ff69 !important; background: transparent !important; box-shadow: none !important; }
+@keyframes __ot_cinema_flow { to { background-position: 53px 0; } }
+@media (max-width: 480px) { #__omnitasker_panel .__ot_body { max-height: calc(100dvh - 110px) !important; } }
+@media (prefers-reduced-motion: reduce) { #__omnitasker_panel, #__omnitasker_panel *, #__omnitasker_panel *::before, #__omnitasker_panel *::after { animation: none !important; transition: none !important; } }
+
 </style>
 
   <!-- Titlebar -->
   <div class="__ot_titlebar" id="__ot_titlebar">
-    <span class="__ot_logo">&#9889; OmniTasker</span>
+    <span class="__ot_logo">&#9889; Cossito</span>
     <span class="__ot_orb" id="__ot_orb"></span>
     <span class="__ot_phase_pill" id="__ot_phase_pill">Idle</span>
     <span class="__ot_spacer"></span>
@@ -725,7 +770,7 @@
     <!-- Live Logs -->
     <div>
       <div class="__ot_logs_bar">
-        <span class="__ot_logs_title">OmniTasker // Logs</span>
+        <span class="__ot_logs_title">Cossito // Logs</span>
         <div class="__ot_dots"><span class="__ot_dot --r"></span><span class="__ot_dot --y"></span><span class="__ot_dot --g"></span></div>
       </div>
       <div class="__ot_logs_box" id="__ot_logs_box">

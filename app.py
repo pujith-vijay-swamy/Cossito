@@ -1,5 +1,5 @@
 """
-app.py — Streamlit frontend for OmniTasker.
+app.py — Streamlit frontend for Cossito.
 
 Provides the configuration & launch surface for the agent.  Real-time
 monitoring also happens via an in-browser glassmorphism overlay panel
@@ -38,7 +38,7 @@ from models import AgentPhase, AgentState, TaskStatus
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="OmniTasker",
+    page_title="Cossito",
     page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -51,48 +51,49 @@ st.set_page_config(
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
-    --bg-primary: #09090b;
-    --bg-secondary: #18181b;
-    --bg-card: #121215;
-    --border-main: 3px solid #27272a;
-    --border-accent: 3px solid #a855f7;
-    --border-black: 3px solid #000000;
-    --accent-purple: #a855f7;
-    --accent-cyan: #38bdf8;
-    --accent-green: #4ade80;
-    --accent-yellow: #facc15;
-    --accent-red: #f43f5e;
+    --bg-primary: #0b1117;
+    --bg-secondary: #121c25;
+    --bg-card: #121c25;
+    --border-main: 3px solid #263644;
+    --border-accent: 3px solid #86e3c3;
+    --border-black: 3px solid #263644;
+    --accent-purple: #86e3c3;
+    --accent-cyan: #8bbcf4;
+    --accent-blue: #86e3c3;
+    --accent-green: #86e3c3;
+    --accent-yellow: #edcc8f;
+    --accent-red: #f29aab;
     --shadow-hard: 4px 4px 0px #000000;
-    --shadow-purple: 4px 4px 0px #a855f7;
-    --shadow-cyan: 4px 4px 0px #38bdf8;
-    --shadow-yellow: 4px 4px 0px #facc15;
-    --text-primary: #ffffff;
-    --text-secondary: #a1a1aa;
+    --shadow-purple: 4px 4px 0px #86e3c3;
+    --shadow-cyan: 4px 4px 0px #8bbcf4;
+    --shadow-yellow: 4px 4px 0px #edcc8f;
+    --text-primary: #edf3f5;
+    --text-secondary: #a5b6c5;
 }
 
-/* Global resets & Brutalist background */
+/* Graphite surfaces with mint accents */
 .stApp {
     font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
 }
 
-/* Resized & Compact Neo-Brutalist Buttons */
+/* Compact controls */
 .stButton > button {
     font-family: 'Outfit', sans-serif !important;
-    font-weight: 800 !important;
+    font-weight: 600 !important;
     font-size: 0.82rem !important;
     padding: 8px 14px !important;
     letter-spacing: 0.04em !important;
-    text-transform: uppercase !important;
-    border: 2.5px solid #000000 !important;
+    text-transform: none !important;
+    border: 1px solid #263644 !important;
     border-radius: 10px !important;
-    background-color: #27272a !important;
-    color: #ffffff !important;
-    box-shadow: 3px 3px 0px #000000 !important;
+    background-color: #263644 !important;
+    color: #edf3f5 !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     transition: all 0.12s ease !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -100,25 +101,25 @@ st.markdown(
     gap: 6px !important;
 }
 .stButton > button:hover {
-    transform: translate(-1.5px, -1.5px) !important;
-    box-shadow: 4.5px 4.5px 0px #000000 !important;
-    background-color: #3f3f46 !important;
-    color: #ffffff !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+    background-color: #314757 !important;
+    color: #edf3f5 !important;
 }
 .stButton > button:active {
-    transform: translate(1.5px, 1.5px) !important;
-    box-shadow: 1.5px 1.5px 0px #000000 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .stButton > button[kind="primary"] {
-    background: #a855f7 !important;
+    background: #86e3c3 !important;
     color: #000000 !important;
-    border: 2.5px solid #000000 !important;
-    box-shadow: 3px 3px 0px #000000 !important;
+    border: 1px solid #263644 !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .stButton > button[kind="primary"]:hover {
-    background: #c084fc !important;
+    background: #b6a6ef !important;
     color: #000000 !important;
-    box-shadow: 4.5px 4.5px 0px #000000 !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 
 /* BaseWeb Input & Select Box Containers — Fix Double Border & Focus Ring */
@@ -126,10 +127,10 @@ div[data-baseweb="input"],
 div[data-baseweb="base-input"], 
 div[data-baseweb="select"] > div,
 div[data-baseweb="textarea"] {
-    background-color: #18181b !important;
-    border: 2.5px solid #27272a !important;
+    background-color: #121c25 !important;
+    border: 1px solid #263644 !important;
     border-radius: 12px !important;
-    box-shadow: 3px 3px 0px #000000 !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     transition: all 0.15s ease !important;
     outline: none !important;
 }
@@ -138,8 +139,8 @@ div[data-baseweb="input"]:focus-within,
 div[data-baseweb="base-input"]:focus-within, 
 div[data-baseweb="select"] > div:focus-within,
 div[data-baseweb="textarea"]:focus-within {
-    border-color: #a855f7 !important;
-    box-shadow: 3px 3px 0px #a855f7 !important;
+    border-color: #86e3c3 !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 
 /* Inner input text & textarea elements — Strip inner borders */
@@ -148,9 +149,9 @@ div[data-baseweb="base-input"] input,
 textarea {
     border: none !important;
     outline: none !important;
-    box-shadow: none !important;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     background: transparent !important;
-    color: #ffffff !important;
+    color: #edf3f5 !important;
     font-family: 'Plus Jakarta Sans', sans-serif !important;
     font-weight: 600 !important;
     font-size: 0.88rem !important;
@@ -163,27 +164,27 @@ div[data-baseweb="select"] input {
     user-select: none !important;
 }
 div[data-baseweb="select"] span {
-    color: #ffffff !important;
+    color: #edf3f5 !important;
     font-weight: 600 !important;
 }
 
 /* Header Banner */
 .agent-header {
-    background: #18181b;
-    border: 3.5px solid #a855f7;
+    background: #121c25;
+    border: 1px solid #86e3c3;
     border-radius: 16px;
     padding: 2.2rem 2.6rem;
     margin-bottom: 2rem;
     position: relative;
-    box-shadow: 6px 6px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .agent-header h1 {
     font-family: 'Outfit', sans-serif;
     font-size: 2.8rem;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: -0.03em;
-    color: #ffffff;
-    text-transform: uppercase;
+    color: #edf3f5;
+    text-transform: none;
     margin: 0;
     display: flex;
     align-items: center;
@@ -192,22 +193,22 @@ div[data-baseweb="select"] span {
 .agent-header h1 span.tag {
     font-size: 0.8rem;
     padding: 4px 12px;
-    background: #a855f7;
+    background: #86e3c3;
     color: #000000;
-    border: 2.5px solid #000000;
+    border: 1px solid #263644;
     border-radius: 8px;
-    box-shadow: 3px 3px 0px #000000;
-    font-weight: 800;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
+    font-weight: 600;
 }
 .agent-header p {
-    color: #a1a1aa;
+    color: #a5b6c5;
     font-size: 1.05rem;
     margin-top: 0.6rem;
     font-weight: 600;
     line-height: 1.5;
 }
 
-/* Neo-Brutalist Status Badge */
+/* Semantic status badges */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -216,50 +217,50 @@ div[data-baseweb="select"] span {
     border-radius: 12px;
     font-family: 'Outfit', sans-serif;
     font-size: 0.95rem;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: 0.05em;
-    text-transform: uppercase;
-    border: 3.5px solid #000000;
-    box-shadow: 5px 5px 0px #000000;
+    text-transform: none;
+    border: 1px solid #263644;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     margin-bottom: 1.5rem;
 }
-.status-idle       { background: #27272a; color: #a1a1aa; }
-.status-recon      { background: #38bdf8; color: #000000; }
-.status-executing  { background: #4ade80; color: #000000; }
-.status-paused     { background: #f43f5e; color: #ffffff; }
-.status-done       { background: #a855f7; color: #000000; }
-.status-error      { background: #f43f5e; color: #ffffff; }
+.status-idle       { background: #263644; color: #a5b6c5; }
+.status-recon      { background: #8bbcf4; color: #000000; }
+.status-executing  { background: #86e3c3; color: #000000; }
+.status-paused     { background: #f29aab; color: #edf3f5; }
+.status-done       { background: #86e3c3; color: #000000; }
+.status-error      { background: #f29aab; color: #edf3f5; }
 
 /* Task Cards */
 .task-card {
-    background: #18181b;
-    border: 3px solid #27272a;
+    background: #121c25;
+    border: 1px solid #263644;
     border-radius: 14px;
     padding: 1.3rem 1.6rem;
     margin-bottom: 1rem;
-    box-shadow: 4px 4px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     transition: all 0.15s ease;
 }
 .task-card:hover {
-    border-color: #a855f7;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px #a855f7;
+    border-color: #86e3c3;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .task-card .task-id {
     font-family: 'Outfit', sans-serif;
     font-size: 0.85rem;
-    font-weight: 900;
-    text-transform: uppercase;
+    font-weight: 700;
+    text-transform: none;
     letter-spacing: 0.08em;
-    color: #a855f7;
-    background: #27272a;
+    color: #86e3c3;
+    background: #263644;
     padding: 2px 10px;
-    border: 2px solid #000000;
+    border: 1px solid #263644;
     border-radius: 6px;
 }
 .task-card .task-desc {
     font-size: 0.98rem;
-    color: #ffffff;
+    color: #edf3f5;
     font-weight: 600;
     margin-top: 10px;
     line-height: 1.5;
@@ -268,70 +269,70 @@ div[data-baseweb="select"] span {
 
 /* Cognitive cards */
 .cog-card {
-    background: #18181b;
-    border: 3px solid #27272a;
+    background: #121c25;
+    border: 1px solid #263644;
     border-radius: 14px;
     padding: 1.4rem 1.6rem;
     margin-bottom: 1.2rem;
-    box-shadow: 4px 4px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     transition: all 0.15s ease;
 }
 .cog-card:hover {
-    border-color: #38bdf8;
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0px #38bdf8;
+    border-color: #8bbcf4;
+    transform: translateY(-1px);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .cog-header {
     font-family: 'Outfit', sans-serif;
     font-size: 0.88rem;
-    font-weight: 900;
-    text-transform: uppercase;
+    font-weight: 700;
+    text-transform: none;
     margin-bottom: 10px;
     display: flex;
     align-items: center;
     gap: 8px;
     letter-spacing: 0.06em;
 }
-.cog-header-thinking { color: #38bdf8; }
-.cog-header-goal     { color: #4ade80; }
-.cog-header-memory   { color: #c084fc; }
-.cog-header-actions  { color: #facc15; }
+.cog-header-thinking { color: #8bbcf4; }
+.cog-header-goal     { color: #86e3c3; }
+.cog-header-memory   { color: #b6a6ef; }
+.cog-header-actions  { color: #edcc8f; }
 
 .cog-content {
     font-size: 0.96rem;
     line-height: 1.6;
-    color: #ffffff;
+    color: #edf3f5;
     font-weight: 500;
 }
 .cog-content-memory {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.88rem;
     line-height: 1.5;
-    color: #38bdf8;
-    background: #09090b;
+    color: #8bbcf4;
+    background: #0b1117;
     padding: 14px;
     border-radius: 10px;
-    border: 2px solid #27272a;
+    border: 1px solid #263644;
     white-space: pre-wrap;
-    box-shadow: inset 2px 2px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 
 /* Failed Injection Card */
 .failed-injection-card {
-    background: #18181b;
-    border: 3.5px solid #f59e0b;
+    background: #121c25;
+    border: 1px solid #edcc8f;
     border-radius: 14px;
     padding: 1.4rem 1.6rem;
     margin-top: 1rem;
     margin-bottom: 1.5rem;
-    box-shadow: 5px 5px 0px #f59e0b;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .failed-injection-header {
     font-family: 'Outfit', sans-serif;
     font-size: 0.95rem;
-    font-weight: 900;
-    text-transform: uppercase;
-    color: #f59e0b;
+    font-weight: 700;
+    text-transform: none;
+    color: #edcc8f;
     margin-bottom: 8px;
     display: flex;
     align-items: center;
@@ -340,7 +341,7 @@ div[data-baseweb="select"] span {
 }
 .failed-injection-desc {
     font-size: 0.92rem;
-    color: #d4d4d8;
+    color: #c6d2dd;
     margin-bottom: 12px;
     line-height: 1.5;
     font-weight: 500;
@@ -348,8 +349,8 @@ div[data-baseweb="select"] span {
 
 /* Log Terminal Panel */
 .terminal-header {
-    background: #27272a;
-    border: 3.5px solid #000000;
+    background: #263644;
+    border: 1px solid #263644;
     border-bottom: none;
     border-top-left-radius: 14px;
     border-top-right-radius: 14px;
@@ -361,8 +362,8 @@ div[data-baseweb="select"] span {
 .terminal-title {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.8rem;
-    font-weight: 800;
-    color: #ffffff;
+    font-weight: 600;
+    color: #edf3f5;
     letter-spacing: 0.08em;
 }
 .terminal-dots {
@@ -373,15 +374,15 @@ div[data-baseweb="select"] span {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    border: 1.5px solid #000000;
+    border: 1.5px solid #263644;
 }
-.dot-red { background-color: #f43f5e; }
-.dot-yellow { background-color: #facc15; }
-.dot-green { background-color: #4ade80; }
+.dot-red { background-color: #f29aab; }
+.dot-yellow { background-color: #edcc8f; }
+.dot-green { background-color: #86e3c3; }
 
 .log-panel {
-    background: #09090b;
-    border: 3.5px solid #000000;
+    background: #0b1117;
+    border: 1px solid #263644;
     border-bottom-left-radius: 14px;
     border-bottom-right-radius: 14px;
     padding: 1.25rem;
@@ -390,48 +391,48 @@ div[data-baseweb="select"] span {
     font-family: 'JetBrains Mono', monospace;
     font-size: 0.88rem;
     line-height: 1.6;
-    box-shadow: 5px 5px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .log-entry {
     padding: 4px 0;
-    border-bottom: 1px solid #18181b;
+    border-bottom: 1px solid #121c25;
 }
 .log-time {
-    color: #71717a;
+    color: #91a3b3;
     margin-right: 10px;
     font-size: 0.8rem;
     font-weight: 600;
 }
-.log-info    { color: #38bdf8; font-weight: 500; }
-.log-success { color: #4ade80; font-weight: 700; }
-.log-warn    { color: #facc15; font-weight: 600; }
-.log-error   { color: #f43f5e; font-weight: 700; }
+.log-info    { color: #8bbcf4; font-weight: 500; }
+.log-success { color: #86e3c3; font-weight: 700; }
+.log-warn    { color: #edcc8f; font-weight: 600; }
+.log-error   { color: #f29aab; font-weight: 700; }
 
 /* HITL Alert */
 .hitl-alert {
-    background: #18181b;
-    border: 3.5px solid #f43f5e;
+    background: #121c25;
+    border: 1px solid #f29aab;
     border-radius: 16px;
     padding: 1.8rem 2.2rem;
     text-align: center;
-    box-shadow: 6px 6px 0px #f43f5e;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
     animation: neo-pulse 2s infinite;
 }
 @keyframes neo-pulse {
-    0%, 100% { box-shadow: 6px 6px 0px #f43f5e; }
-    50%      { box-shadow: 8px 8px 0px #facc15; }
+    0%, 100% { box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
+    50%      { box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
 }
 .hitl-alert h3 {
     font-family: 'Outfit', sans-serif;
-    color: #f43f5e;
+    color: #f29aab;
     margin: 0 0 0.6rem 0;
     font-size: 1.4rem;
-    font-weight: 900;
+    font-weight: 700;
     letter-spacing: 0.03em;
-    text-transform: uppercase;
+    text-transform: none;
 }
 .hitl-alert p {
-    color: #d4d4d8;
+    color: #c6d2dd;
     margin: 0;
     line-height: 1.5;
     font-weight: 500;
@@ -439,21 +440,130 @@ div[data-baseweb="select"] span {
 
 /* Progress bar */
 .progress-bar-container {
-    background: #18181b;
-    border: 3px solid #000000;
+    background: #121c25;
+    border: 1px solid #263644;
     border-radius: 10px;
     height: 16px;
     overflow: hidden;
     margin: 1rem 0;
-    box-shadow: 3px 3px 0px #000000;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
 }
 .progress-bar-fill {
     height: 100%;
     border-radius: 8px;
-    background: linear-gradient(90deg, #38bdf8, #a855f7, #4ade80);
-    border-right: 2px solid #000000;
+    background: linear-gradient(90deg, #8bbcf4, #86e3c3, #86e3c3);
+    border-right: 1px solid #263644;
     transition: width 0.4s ease;
 }
+
+/* Cossito / kinetic poster system. Presentation only. */
+:root {
+    --bg-primary: #101014; --bg-secondary: #19191f; --bg-card: #202027;
+    --accent-purple: #c1a0ff; --accent-cyan: #94d5ff; --accent-blue: #e9ff69;
+    --accent-green: #b9f887; --accent-yellow: #e9ff69; --accent-red: #ff8b98;
+    --text-primary: #fffbed; --text-secondary: #b9b6c5;
+}
+.stApp {
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif; color-scheme: dark; color: #fffbed;
+    background: radial-gradient(ellipse at 95% 0%, #633e8c35, transparent 44%), radial-gradient(ellipse at 0% 65%, #ff794310, transparent 35%), #101014;
+}
+[data-testid="stHeader"] { background: #101014ee; border-bottom: 1px solid #3e3a47; }
+[data-testid="stSidebar"] { background: #17171d; border-right: 2px solid #44404d; }
+[data-testid="stSidebar"] > div:first-child { padding-top: 2rem; }
+[data-testid="stMainBlockContainer"] { max-width: 1640px; padding: 2rem 3rem 4rem; }
+[data-testid="stMarkdownContainer"] h3, [data-testid="stMarkdownContainer"] h4 {
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-weight: 700; letter-spacing: -.04em; color: #fffbed;
+}
+[data-testid="stWidgetLabel"] p { color: #d8d2e2; font-size: .83rem; font-weight: 600; }
+[data-testid="stCaptionContainer"] { color: #b9b6c5; }
+hr { border-color: #44404d !important; }
+[data-testid="stMetric"] { background: #202027; border: 2px solid #6c6578; border-radius: 8px; padding: 18px 22px; box-shadow: 5px 5px 0 #050507; }
+[data-testid="stMetricValue"] { color: #e9ff69; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+.agent-header {
+    isolation: isolate; position: relative; overflow: hidden; padding: 2.4rem 2.7rem 2rem;
+    border: 2px solid #fffbed; border-radius: 10px; margin-bottom: 2.4rem;
+    background: linear-gradient(115deg, #ffb078 0%, #ff855e 48%, #f278b4 100%);
+    box-shadow: 8px 8px 0 #050507, 9px 9px 0 #706273;
+    animation: cossito-reveal .75s cubic-bezier(.16,1,.3,1) both;
+}
+.agent-header::before {
+    content: ''; pointer-events: none; position: absolute; z-index: -1; width: 380px; height: 380px;
+    right: -90px; top: -125px; border-radius: 50%; border: 1px solid #24192740;
+    background: repeating-conic-gradient(from 0deg, #29152820 0deg 1deg, transparent 1deg 12deg);
+    box-shadow: 0 0 0 28px #fffbed12, 0 0 0 29px #20102320, 0 0 0 66px #fffbed0c;
+    animation: cossito-orbit 40s linear infinite;
+}
+.agent-header::after {
+    content: ''; pointer-events: none; position: absolute; z-index: -1; right: 16%; top: -50%; width: 100px; height: 230%;
+    background: #fffbed23; transform: rotate(25deg); animation: cossito-light 12s ease-in-out infinite alternate;
+}
+.agent-header h1 {
+    font-family: 'Anton', 'Impact', 'Arial Narrow', sans-serif; text-transform: uppercase;
+    color: #17131d; font-size: clamp(4.5rem, 8.5vw, 8.5rem); font-weight: 400;
+    letter-spacing: -.035em; line-height: 1.02; margin: 0 0 1.1rem; display: block;
+    text-shadow: 2px 2px 0 #fffbed, 5px 5px 0 #17131d30; transform: skewX(-3deg);
+}
+.agent-header p { color: #30202c; max-width: 620px; font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-size: .95rem; font-weight: 500; line-height: 1.7; margin: 0; }
+.stButton > button {
+    min-height: 44px; font-family: 'Space Grotesk', 'Segoe UI', sans-serif !important; font-size: .86rem !important; font-weight: 700 !important;
+    text-transform: none !important; letter-spacing: -.015em !important; border: 2px solid #89808f !important;
+    border-radius: 7px !important; background: #26242e !important; color: #fffbed !important;
+    box-shadow: 4px 4px 0 #050507 !important; transition: transform .18s ease, box-shadow .18s ease, background .18s ease !important;
+}
+.stButton > button:hover { background: #38313f !important; color: #fffbed !important; transform: translate(-2px,-2px) rotate(-.6deg) !important; box-shadow: 6px 6px 0 #050507 !important; border-color: #c1a0ff !important; }
+.stButton > button:active { transform: translate(3px,3px) !important; box-shadow: 1px 1px 0 #050507 !important; }
+.stButton > button[kind="primary"] { background: #e9ff69 !important; color: #1a2010 !important; border-color: #e9ff69 !important; box-shadow: 4px 4px 0 #050507, 5px 5px 0 #778a40 !important; }
+.stButton > button[kind="primary"]:hover { background: #f4ffb0 !important; color: #1a2010 !important; box-shadow: 6px 6px 0 #050507, 7px 7px 0 #e9ff69 !important; }
+.stButton > button:disabled { opacity: .4; transform: none !important; box-shadow: none !important; }
+.stButton > button:focus-visible { outline: 2px solid #fffbed !important; outline-offset: 4px !important; }
+div[data-baseweb="input"], div[data-baseweb="select"] > div, div[data-baseweb="textarea"] { background: #101014 !important; border: 2px solid #5e566b !important; border-radius: 7px !important; box-shadow: 3px 3px 0 #050507 !important; }
+div[data-baseweb="base-input"] { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+div[data-baseweb="input"] input, div[data-baseweb="base-input"] input, textarea { font-family: 'Space Grotesk', 'Segoe UI', sans-serif !important; color: #fffbed !important; font-weight: 400 !important; }
+div[data-baseweb="input"]:focus-within, div[data-baseweb="select"] > div:focus-within, div[data-baseweb="textarea"]:focus-within { border-color: #c1a0ff !important; box-shadow: 3px 3px 0 #c1a0ff !important; }
+div[data-baseweb="select"] input { caret-color: #c1a0ff !important; user-select: text !important; }
+div[data-baseweb="popover"] [role="listbox"] { background: #202027; color: #fffbed; border: 2px solid #6c6578; }
+.status-badge { padding: 8px 15px; font: 700 .78rem 'Space Grotesk', sans-serif; letter-spacing: .015em; border: 2px solid #050507; border-radius: 5px; box-shadow: 3px 3px 0 #050507; margin-bottom: 1rem; transform: rotate(-1deg); }
+.status-idle { color: #d8d2e2; background: #302b37; }
+.status-recon { color: #142b3b; background: #94d5ff; }
+.status-executing { color: #242e0b; background: #e9ff69; animation: cossito-status 3s ease-in-out infinite; }
+.status-done { color: #21162f; background: #c1a0ff; }
+.status-paused { color: #361d0c; background: #ffb078; }
+.status-error { color: #39151c; background: #ff8b98; }
+.task-card, .cog-card { background: #202027; padding: 1.4rem 1.5rem; border: 2px solid #635a70; border-radius: 9px; box-shadow: 5px 5px 0 #050507; transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+.task-card:hover { border-color: #e9ff69; transform: translate(-2px,-3px); box-shadow: 7px 8px 0 #050507, 8px 9px 0 #e9ff6970; }
+.cog-card:hover { border-color: #c1a0ff; transform: translate(-2px,-3px); box-shadow: 7px 8px 0 #050507, 8px 9px 0 #c1a0ff70; }
+.task-card .task-id { font: 500 .7rem 'JetBrains Mono', monospace; background: #e9ff69; color: #242e0b; border: 1px solid #050507; border-radius: 4px; padding: 4px 9px; letter-spacing: .025em; }
+.task-card .task-desc, .cog-content { font-family: 'Space Grotesk', 'Segoe UI', sans-serif; font-size: .94rem; line-height: 1.8; font-weight: 400; color: #eee7f3; overflow-wrap: anywhere; }
+.cog-header { font: 700 .78rem 'Space Grotesk', sans-serif; letter-spacing: .025em; }
+.cog-header-thinking { color: #94d5ff; }.cog-header-goal { color: #e9ff69; }.cog-header-memory { color: #c1a0ff; }.cog-header-actions { color: #ffb078; }
+.cog-content-memory { background: #131117; color: #cfc0ef; border: 1px solid #5e566b; box-shadow: none; font-size: .8rem; }
+.terminal-header { background: #c1a0ff; border: 2px solid #050507; border-bottom: 0; padding: 13px 18px; border-radius: 7px 7px 0 0; }
+.terminal-title { font: 700 .67rem 'JetBrains Mono', monospace; color: #241535; letter-spacing: .08em; }
+.terminal-dot { width: 8px; height: 8px; border: 1px solid #241535; }.dot-red { background: #ff8b98; }.dot-yellow { background: #e9ff69; }.dot-green { background: #b9f887; }
+.log-panel { background: #131117; border: 2px solid #5e566b; border-top: 0; box-shadow: 5px 5px 0 #050507; font-size: .8rem; line-height: 1.8; border-radius: 0 0 7px 7px; overflow-wrap: anywhere; }
+.log-time { color: #ada2ba; font-size: .73rem; font-weight: 400; }.log-info { color: #94d5ff; }.log-success { color: #b9f887; }.log-warn { color: #e9ff69; }.log-error { color: #ff8b98; }
+.log-entry { padding: 7px 0; border-bottom-color: #3b3345; }
+.hitl-alert, .failed-injection-card { background: #2e211f; border: 2px solid #ffb078; box-shadow: 5px 5px 0 #050507; animation: none; }
+.hitl-alert h3, .failed-injection-header { color: #ffb078; font-family: 'Space Grotesk', sans-serif; font-weight: 700; }
+.progress-bar-container { background: #28222f; height: 12px; border: 2px solid #635a70; border-radius: 4px; box-shadow: 3px 3px 0 #050507; }
+.progress-bar-fill { border: none; border-radius: 1px; background: repeating-linear-gradient(115deg, #e9ff69 0 16px, #bbd344 16px 24px); background-size: 53px 100%; animation: cossito-flow 2s linear infinite; }
+.stApp * { scrollbar-width: thin; scrollbar-color: #736182 #17171d; }
+@keyframes cossito-reveal { from { opacity: 0; transform: translateY(18px) rotate(-.7deg); } to { opacity: 1; transform: none; } }
+@keyframes cossito-orbit { to { transform: rotate(360deg); } }
+@keyframes cossito-light { from { transform: translateX(-50px) rotate(25deg); } to { transform: translateX(150px) rotate(25deg); } }
+@keyframes cossito-flow { to { background-position: 53px 0; } }
+@keyframes cossito-status { 0%,100% { box-shadow: 3px 3px 0 #050507; } 50% { box-shadow: 3px 3px 0 #050507, 0 0 16px #e9ff6925; } }
+@media (max-width: 760px) {
+    [data-testid="stMainBlockContainer"] { padding: 1.25rem 1.1rem 2rem; }
+    .agent-header { padding: 1.8rem 1.3rem; margin-bottom: 1.8rem; box-shadow: 5px 5px 0 #050507; }
+    .agent-header h1 { font-size: clamp(3.5rem, 17vw, 6rem); }
+    .agent-header p { font-size: .85rem; }.agent-header::before { right: -260px; }
+    .task-card, .cog-card { padding: 1.1rem; }.terminal-title { letter-spacing: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .stApp *, .stApp *::before, .stApp *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -721,7 +831,7 @@ state: AgentState = st.session_state.agent_state
 st.markdown(
     """
 <div class="agent-header">
-    <h1>OmniTasker <span class="tag">NEO-BRUTAL V2</span></h1>
+    <h1>Cossito</h1>
     <p>Autonomous browser coding engine with real-time DOM injection & Human-in-the-Loop orchestration.</p>
 </div>
 """,
@@ -984,13 +1094,13 @@ def render_dashboard():
                     height: 8px;
                     background-color: #58a6ff;
                     border-radius: 50%;
-                    box-shadow: 0 0 8px #58a6ff;
+                    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
                     animation: pulse-blue 1.8s infinite;
                 }
                 @keyframes pulse-blue {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(88, 166, 255, 0.7); }
-                    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(88, 166, 255, 0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(88, 166, 255, 0); }
+                    0% { transform: scale(0.95); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
+                    70% { transform: scale(1); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
+                    100% { transform: scale(0.95); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
                 }
                 </style>
                 """,
@@ -1010,13 +1120,13 @@ def render_dashboard():
                     height: 8px;
                     background-color: #f85149;
                     border-radius: 50%;
-                    box-shadow: 0 0 8px #f85149;
+                    box-shadow: 0 8px 28px rgba(0, 0, 0, .16);
                     animation: pulse-red 1.8s infinite;
                 }
                 @keyframes pulse-red {
-                    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0.7); }
-                    70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(248, 81, 73, 0); }
-                    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(248, 81, 73, 0); }
+                    0% { transform: scale(0.95); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
+                    70% { transform: scale(1); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
+                    100% { transform: scale(0.95); box-shadow: 0 8px 28px rgba(0, 0, 0, .16); }
                 }
                 </style>
                 """,
@@ -1107,7 +1217,7 @@ def render_dashboard():
         st.markdown("#### 📜 Live Logs")
         terminal_header_html = """
         <div class="terminal-header">
-            <span class="terminal-title">OMNITASKER // CORE EXECUTION LOGS</span>
+            <span class="terminal-title">COSSITO // CORE EXECUTION LOGS</span>
             <div class="terminal-dots">
                 <span class="terminal-dot dot-red"></span>
                 <span class="terminal-dot dot-yellow"></span>

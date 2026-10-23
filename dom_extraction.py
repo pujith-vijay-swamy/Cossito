@@ -1,5 +1,5 @@
 """
-dom_extraction.py — DOM extraction and code injection utilities for OmniTasker.
+dom_extraction.py — DOM extraction and code injection utilities for Cossito.
 
 Contains JS evaluation functions extracted from AgentOrchestrator
 for problem statement extraction, editor code injection, and reference

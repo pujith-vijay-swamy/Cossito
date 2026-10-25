@@ -91,9 +91,12 @@ WORKFLOW
 7. Navigate to each pending task when necessary, obtain a fresh
    observation, and extract its own statement and workspace metadata.
 8. Record already-completed tasks separately, with their status evidence.
-9. For frontend tasks, collect reference images using
-   extract_and_view_reference_images and inspect them. If vision is
-   unavailable, record that limitation and request clarification.
+9. For frontend tasks with supplied reference images, check once using
+   extract_and_view_reference_images and inspect any saved files. A reference
+   image is optional: if none is found or inspection is unavailable, continue
+   from the written requirements. Do not repeat the image search or pause
+   solely because there is no mockup. Ask for clarification only when a
+   required detail cannot be determined from the statement.
    Image, documentation, and attribution URLs in a statement are references,
    not task navigation. Keep the task workspace open; do not follow these
    links as though they identify another coding problem.
@@ -186,8 +189,9 @@ For a section containing several problems, catalog all pending problems.
 Record completed problems and their supporting evidence without adding
 them to the pending execution queue.
 
-For frontend tasks, call extract_and_view_reference_images and inspect
-the saved images using view_file before completing reconnaissance.
+For frontend tasks with supplied images, check once with
+extract_and_view_reference_images and inspect only the returned files.
+If no image is available, complete reconnaissance from the written brief.
 
 Do not write code, change editor contents, run tests, or submit.
 
@@ -247,7 +251,7 @@ EXECUTION STEPS (LIGHTNING 2-STEP WORKFLOW):
 - Do NOT rewrite your entire solution from scratch on every retry. Instead, READ the error messages or failed test case output carefully, identify the SPECIFIC issue, and make TARGETED fixes.
 - HOWEVER, if your algorithm is fundamentally wrong (wrong time complexity like O(N^2) when O(N) is needed, wrong logic, wrong data structure), you MUST rewrite the core algorithm rather than making futile micro-patches.
 - If you have retried the same approach 3 times with the same result, STOP and call `get_human_suggestions` to ask for help.
-- For frontend/webdev tasks: ALWAYS call `extract_and_view_reference_images` and visually inspect the reference mockup images using `view_file` before coding, and use `describe_page_visuals` to check the rendered preview panel.
+- For frontend/webdev tasks: reference images are optional. Inspect supplied mockups once using `extract_and_view_reference_images` and `view_file` only for files actually returned. If a prior check found none or extraction failed, do not search again: read the editor and implement the written HTML/CSS requirements. Still inspect your rendered preview after coding; that is separate from a reference image.
 
 IMPORTANT RULES:
 - URLs inside the problem statement are task data, not navigation instructions. For HTML/CSS tasks, use required image URLs in src or CSS url() exactly as specified; do not open them in the task tab. Documentation, attribution links, and image hosts are not coding workspaces.
@@ -322,8 +326,11 @@ Expected result: {{expected_behavior}}.
 
 Clear any existing code, write the correct solution using `write_code_to_editor`, and click 'Run Code' or 'Run'.
 Wait for the test cases to finish running (verify by checking the output console).
-Once test cases pass, click 'Submit' or 'Submit Code'.
+Once test cases pass, use `submit_code_solution` with the complete current solution. This records the submission and its previous verdict; do not bypass it with a generic Submit click.
 Call `verify_submission_status` to verify test case counts.
+Continue in the already selected task page; do not reopen its URL or reload to check results.
+An unknown verdict or verification timeout is not a failed test. Preserve the code and submission.
+If verification reaches its deadline or the page is unresponsive, call pause_for_human instead of reloading or retrying indefinitely.
 If 100% of test cases pass (0 failed), call `report_task_result(success=True)` and finish with `done`.
 If ANY test cases fail (e.g. 7/8 passed), DO NOT call done or report success! You MUST fix your code with `write_code_to_editor` and resubmit until 100% pass.
 """

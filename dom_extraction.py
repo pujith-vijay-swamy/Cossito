@@ -92,12 +92,66 @@ def has_problem_statement_markers(text: str) -> bool:
     return (strong_hits + general_hits) >= 2
 
 
+def is_loading_placeholder(text: str) -> bool:
+    """Recognize temporary status copy, without rejecting tasks about loaders."""
+    text = re.sub(r'\s+', ' ', text or '').strip()
+    if not text:
+        return True
+    if has_problem_statement_markers(text) or re.search(
+        r'\b(build|create|implement|design|write|given)\b', text, re.I
+    ):
+        return False
+    return bool(re.search(
+        r'^(?:(?:loading|initializing|connecting|fetching|preparing)\b|please\s+wait\b|just\s+a\s+moment\b)',
+        text, re.I,
+    ))
+
+
+PAGE_READINESS_SCRIPT = r"""() => {
+    const visible = el => !!(el.getClientRects().length) &&
+        getComputedStyle(el).visibility !== 'hidden';
+    const root = document.querySelector('main, [role="main"]') || document.body;
+    if (!root) return {text: '', busy: true};
+    const excluded = '#__omnitasker_panel, script, style, noscript, nav, header, footer, .monaco-editor, .CodeMirror, .cm-editor, .ace_editor, [hidden], [aria-hidden="true"]';
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const texts = [];
+    while (walker.nextNode()) {
+        const parent = walker.currentNode.parentElement;
+        if (parent && !parent.closest(excluded) && visible(parent)) texts.push(walker.currentNode.textContent);
+    }
+    const text = texts.join(' ').replace(/\s+/g, ' ').trim();
+    const busy = document.readyState === 'loading' ||
+        (root.getAttribute('aria-busy') === 'true') ||
+        Array.from(root.querySelectorAll('[aria-busy="true"], [class*="skeleton" i]'))
+            .some(el => !el.closest(excluded) && visible(el));
+    return {text, busy};
+}"""
+
+
+async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: float = 0.3) -> None:
+    """Require stable application content, not just a committed URL or load event."""
+    async def poll():
+        previous = None
+        while True:
+            snapshot = parse_eval_result(await page.evaluate(PAGE_READINESS_SCRIPT))
+            text = snapshot.get('text', '') if isinstance(snapshot, dict) else ''
+            ready = isinstance(snapshot, dict) and not snapshot.get('busy') and not is_loading_placeholder(text)
+            if ready and text == previous:
+                return
+            previous = text if ready else None
+            await asyncio.sleep(poll_interval)
+    try:
+        await asyncio.wait_for(poll(), timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise RuntimeError('Page content is still loading or unavailable; refusing to solve a loading screen.') from exc
+
+
 def clean_extracted_problem_text(text: str) -> str:
     """Strip site navbar, chapter sidebar, and trailing code editor/runner noise from extracted text.
 
     If the text is purely navigation/overview without a problem statement, returns "".
     """
-    if not text or not isinstance(text, str):
+    if not text or not isinstance(text, str) or is_loading_placeholder(text):
         return ""
     cleaned = text.strip()
     if len(cleaned) < 15:
@@ -333,6 +387,9 @@ async def extract_problem_from_dom(
             }
 
             function extractWithImages(el, allowSlice = false) {
+                if (!el || !el.getClientRects().length ||
+                    getComputedStyle(el).visibility === 'hidden' ||
+                    el.closest('[hidden], [aria-hidden="true"]')) return null;
                 if (!el) return null;
                 let text = cleanText(el.innerText || el.textContent || '');
                 if (text.length < 20) return null;
@@ -1109,6 +1166,7 @@ async def extract_ref_images_to_disk(
     page: Any,
     output_dir: Optional[Path] = None,
     log_fn: Optional[Callable[[str, str], None]] = None,
+    capture_context: Optional[Callable] = None,
 ) -> list[dict]:
     """
     Extract all reference/mockup images from the current page and save them
@@ -1200,13 +1258,15 @@ async def extract_ref_images_to_disk(
     }""")
 
     try:
-        candidates = json.loads(extracted_data_str)
+        candidates = parse_eval_result(extracted_data_str)
+        if not isinstance(candidates, list):
+            candidates = []
     except Exception as e:
         _log(f"Failed to parse extracted images JSON: {e}", "warn")
         candidates = []
 
     if not candidates:
-        _log("No reference images (>= 50px, excluding profile pictures/logos) found on the page.", "warn")
+        _log("Reference check complete: no usable mockup found. Continuing from the written requirements.", "info")
         return []
 
     _log(f"Found {len(candidates)} candidate reference mockup images (filtered for privacy). Capturing...", "info")
@@ -1276,7 +1336,9 @@ async def extract_ref_images_to_disk(
         return None
 
     for idx, item in enumerate(candidates[:10]):
-        res = await capture_candidate(idx, item)
+        async def capture():
+            return await capture_candidate(idx, item)
+        res = await capture_context(page, capture) if capture_context else await capture()
         if res:
             saved_paths.append(res)
 

@@ -12,6 +12,7 @@ import asyncio
 import hashlib
 import json
 import traceback
+import time
 from typing import Any, Optional
 
 from browser_use import Controller
@@ -25,7 +26,7 @@ from models import (
     TaskStatus,
     WorkspaceSnapshot,
 )
-from platform_adapters import detect_platform, wait_for_terminal
+from platform_adapters import detect_platform, wait_for_terminal, result_fingerprint
 from state_machine import can_transition, transition
 from verification import verify_submission
 import sys
@@ -398,7 +399,8 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
     @controller.action(
         "Extract all design mockup or reference images from the problem description page, screenshot them, and save them in the workspace. "
-        "Call this action immediately as one of your first steps in any frontend/UI assignment, and then inspect the resulting images using the `view_file` tool."
+        "Use once when the task supplies reference images, then inspect only the returned files with view_file. "
+        "An empty result is not a blocker: continue implementing the written requirements."
     )
     async def extract_and_view_reference_images() -> str:
         # Check for stop request
@@ -412,7 +414,12 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             orchestrator._log("📸 Extracting reference images from problem statement...")
             saved = await orchestrator._extract_ref_images_to_disk()
             if not saved:
-                return f"No design mockup or reference images were found or could be saved from the page.{suggestions_block}"
+                return (
+                    "Reference check complete: no usable reference images were found or could be saved. "
+                    "Do not repeat extraction or call view_file without a returned path. "
+                    "Continue now: read_code_from_editor, implement the written requirements, "
+                    f"and verify the rendered preview after coding.{suggestions_block}"
+                )
 
             report_lines = [f"Successfully extracted and saved {len(saved)} reference images:"]
             for img in saved:
@@ -427,7 +434,10 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             raise
         except Exception as e:
             orchestrator._log(f"⚠️ Failed to extract reference images: {e}", "warn")
-            return f"Error: Failed to extract reference images: {e}{suggestions_block}"
+            return (
+                f"Reference inspection unavailable: {e}. Continue from the written requirements; "
+                f"do not wait for images or repeat extraction.{suggestions_block}"
+            )
 
     @controller.action(
         "Skip the current task and proceed immediately to the next task in the TaskQueue. "
@@ -453,6 +463,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
         orchestrator.state.hitl_reason = reason
         orchestrator._notify()
         await orchestrator.hitl.trigger_pause(reason)
+        orchestrator._submission_check_window = None
         # When we get here, the human has resumed.
         orchestrator._set_phase(AgentPhase.EXECUTING)
         orchestrator.state.hitl_reason = None
@@ -473,6 +484,10 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                 "❌ CANNOT REPORT SUCCESS: You have NOT written any code solution to the editor yet!\n"
                 f"You MUST first write the solution code using `write_code_to_editor` or `submit_code_solution`, and verify test cases before reporting success!{suggestions_block}"
             )
+
+        if success and not getattr(orchestrator, '_task_completed_successfully', False):
+            return ('Cannot report success without a verified platform submission. '
+                    'Submit the solution and call verify_submission_status; remain on this task.' + suggestions_block)
 
         orchestrator._last_report = {
             "task_id": task_id,
@@ -517,17 +532,45 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
         suggestions_block = consume_suggestions_block(orchestrator, "verify_submission_status")
         try:
-            browser = await orchestrator.browser_mgr.get_browser()
-            page = await orchestrator._get_current_page_safe(browser)
-            if page is None:
-                return f"⚠️ Active page unavailable to check submission status.{suggestions_block}"
-
             current_task = orchestrator._current_task
             if current_task is None and orchestrator.state.task_queue and orchestrator.state.task_queue.tasks:
                 current_task = orchestrator.state.task_queue.tasks[orchestrator.state.current_task_index]
 
-            adapter = await _get_sym("detect_platform", detect_platform)(page)
-            record = await adapter.parse_result(page)
+            if current_task is None or getattr(orchestrator, '_submission_started_task_id', None) != current_task.task_id:
+                return ('No confirmed submission has been started for this task. Use submit_code_solution '
+                        'to submit the current solution before verifying; running tests alone is not a submission.' + suggestions_block)
+
+            task_key = getattr(current_task, 'task_id', None)
+            window = getattr(orchestrator, '_submission_check_window', None)
+            if window is None or window[0] != task_key:
+                window = (task_key, time.monotonic())
+                orchestrator._submission_check_window = window
+            remaining = 60.0 - (time.monotonic() - window[1])
+            if remaining <= 0:
+                return (
+                    'Submission verification deadline reached; the outcome is unknown. '
+                    'Do not reload, rewrite, resubmit, or keep checking. Call pause_for_human '
+                    f'to inspect the existing submission and preserve the page.{suggestions_block}'
+                )
+
+            async def read_submission():
+                browser = await orchestrator.browser_mgr.get_browser()
+                page = await orchestrator._get_current_page_safe(browser)
+                if page is None:
+                    raise RuntimeError('Active page unavailable')
+                adapter = await _get_sym("detect_platform", detect_platform)(page)
+                return await adapter.parse_result(page)
+
+            record = await asyncio.wait_for(read_submission(), timeout=min(10.0, remaining))
+
+            baseline = getattr(orchestrator, '_submission_baseline', None)
+            if not record.terminal:
+                orchestrator._submission_observed_pending = True
+            if (record.terminal and baseline is not None
+                    and not getattr(orchestrator, '_submission_observed_pending', False)
+                    and result_fingerprint(record) == result_fingerprint(baseline)):
+                return ('The visible verdict has not changed from before this attempt. '
+                        'It is not proof of a new submission. Stay on this task and inspect its submission status.' + suggestions_block)
 
             if current_task:
                 record.task_id = current_task.task_id
@@ -537,12 +580,15 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                     record.code_hash = hashlib.sha256(current_task.solution_code.encode("utf-8")).hexdigest()[:16]
 
             if not record.terminal:
-                return f"⏳ Submission is currently evaluating test cases. Wait 3 seconds and call verify_submission_status again.{suggestions_block}"
+                return f"No final submission verdict is visible yet. Preserve the page and code; do not reload or resubmit. Wait briefly before checking again.{suggestions_block}"
+
+            orchestrator._submission_check_window = None
 
             success, v_result = _get_sym("verify_submission", verify_submission)(record, current_task or CodingTask())
 
             if success:
                 if current_task:
+                    current_task.submissions.append(record)
                     current_task.status = TaskStatus.SUCCESS
                     if can_transition(current_task, TaskState.PASSED):
                         transition(current_task, TaskState.PASSED)
@@ -591,6 +637,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
         except asyncio.CancelledError:
             raise
+        except asyncio.TimeoutError:
+            return ('Submission status read timed out; the outcome is unknown. Do not reload '
+                    'or resubmit. Call pause_for_human if the page remains unresponsive.' + suggestions_block)
         except Exception as e:
             return f"Error verifying submission status: {e}{suggestions_block}"
 
@@ -619,6 +668,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             raise asyncio.CancelledError("Stop requested by user.")
 
         suggestions_block = consume_suggestions_block(orchestrator, "write_code_to_editor")
+        orchestrator._submission_started_task_id = None
+        orchestrator._task_completed_successfully = False
+        orchestrator._last_report = None
 
         try:
             orchestrator._log("⚡ Writing complete code solution into editor...")
@@ -725,6 +777,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                     write_success = True
                     snap_before = WorkspaceSnapshot(editor_kind="direct_injected", content=code)
                     orchestrator._log(f"⚡ Direct editor injection succeeded: {direct_res}", "success")
+            if not write_success:
+                orchestrator._code_written_in_current_task = False
+                return f"Code could not be written to the editor. Submission was not attempted; inspect the editor before retrying.{suggestions_block}"
             
             new_snap = WorkspaceSnapshot(
                 editor_kind=snap_before.editor_kind or "editor",
@@ -741,21 +796,34 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
             # 2. Submit via platform adapter
             adapter = await _get_sym("detect_platform", detect_platform)(page)
+            baseline = await asyncio.wait_for(adapter.parse_result(page), timeout=10.0)
+            orchestrator._submission_baseline = baseline
+            orchestrator._submission_observed_pending = False
             clicked = await adapter.click_submit(page)
             if clicked:
+                orchestrator._submission_started_task_id = current_task.task_id if current_task else None
+                orchestrator._submission_check_window = (current_task.task_id if current_task else None, time.monotonic())
                 orchestrator._log("⚡ Submit button clicked successfully.", "success")
             else:
-                orchestrator._log("⚠️ Submit click via adapter not confirmed, attempting visual fallback...", "warn")
+                orchestrator._log("Submit was not clicked; skipping the result wait.", "warn")
+                return f"Submission was not started: no enabled Submit control was clicked. Inspect the current page and submit control before retrying; do not wait for tests that have not started.{suggestions_block}"
 
             if current_task and can_transition(current_task, TaskState.VERIFYING):
                 transition(current_task, TaskState.VERIFYING)
 
             # 3. Wait for terminal result & verify
-            record = await _get_sym("wait_for_terminal", wait_for_terminal)(page, adapter, timeout=30.0, poll_interval=1.0)
+            record = await _get_sym("wait_for_terminal", wait_for_terminal)(page, adapter, timeout=30.0, poll_interval=1.0, baseline=baseline)
             if current_task:
                 record.task_id = current_task.task_id
                 record.code_hash = new_snap.content_hash
                 current_task.submissions.append(record)
+
+            if not record.terminal:
+                return (
+                    "Submission has no confirmed final result yet. Do not submit again or rewrite code "
+                    "because of this wait timeout. Call verify_submission_status to inspect the existing "
+                    f"submission; if it remains pending, report that status.{suggestions_block}"
+                )
 
             success, v_result = _get_sym("verify_submission", verify_submission)(record, current_task or CodingTask())
 

@@ -49,6 +49,7 @@ class HumanInTheLoopController:
 
     def __init__(self) -> None:
         self._resume_event: Optional[asyncio.Event] = None
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
         self.is_paused: bool = False
         self.pause_reason: str = ""
 
@@ -62,9 +63,16 @@ class HumanInTheLoopController:
     def _ensure_event(self) -> asyncio.Event:
         """Lazily create the Event on the running loop."""
         if self._resume_event is None:
+            self._event_loop = asyncio.get_running_loop()
             self._resume_event = asyncio.Event()
             self._resume_event.set()  # start unpaused
         return self._resume_event
+
+    def _signal_resume(self) -> None:
+        """Wake the agent safely when controls run on the Streamlit thread."""
+        if self._resume_event is not None and self._event_loop is not None:
+            if not self._event_loop.is_closed():
+                self._event_loop.call_soon_threadsafe(self._resume_event.set)
 
     # ------------------------------------------------------------------
     # Agent-side API
@@ -150,8 +158,7 @@ class HumanInTheLoopController:
         self._skip_requested = False
         self._cancel_requested = False
         self.pending_commands.append(ControlCommand.RESUME)
-        if self._resume_event is not None:
-            self._resume_event.set()
+        self._signal_resume()
 
     def skip(self, task_id: Optional[str] = None) -> None:
         """Request the current task be skipped.
@@ -172,8 +179,7 @@ class HumanInTheLoopController:
         # Also resume so the agent loop unblocks
         self.is_paused = False
         self.pause_reason = ""
-        if self._resume_event is not None:
-            self._resume_event.set()
+        self._signal_resume()
 
     def cancel(self) -> None:
         """Request cancellation of the current run.
@@ -185,8 +191,7 @@ class HumanInTheLoopController:
         self.pending_commands.append(ControlCommand.CANCEL)
         self.is_paused = False
         self.pause_reason = ""
-        if self._resume_event is not None:
-            self._resume_event.set()
+        self._signal_resume()
 
     def add_guidance(self, task_id: str, guidance: str) -> None:
         """Attach guidance to a specific task.
@@ -213,8 +218,7 @@ class HumanInTheLoopController:
         if self.is_paused:
             self.is_paused = False
             self.pause_reason = ""
-            if self._resume_event is not None:
-                self._resume_event.set()
+            self._signal_resume()
 
     # ------------------------------------------------------------------
     # URL matching

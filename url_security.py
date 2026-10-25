@@ -17,6 +17,30 @@ import re
 from pathlib import Path
 from typing import Optional, Set
 from urllib.parse import urlparse
+import ipaddress
+
+
+def normalize_target_url(value: str) -> str:
+    """Validate targets and infer HTTP for local addresses, HTTPS otherwise."""
+    value = (value or '').strip()
+    if not value:
+        raise ValueError('Enter a target URL.')
+    if '://' not in value:
+        host = urlparse('//' + value).hostname or ''
+        local = host == 'localhost' or host.endswith('.localhost')
+        try:
+            address = ipaddress.ip_address(host)
+            local = local or address.is_loopback or address.is_private
+        except ValueError:
+            pass
+        value = ('http://' if local else 'https://') + value
+    parsed = urlparse(value)
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname:
+        raise ValueError('Use an HTTP or HTTPS target URL.')
+    if parsed.username or parsed.password or any(c.isspace() for c in parsed.netloc):
+        raise ValueError('Enter a valid target host without embedded credentials.')
+    _ = parsed.port  # Validate the port before starting the browser.
+    return value
 
 from models import ControlCommand, SecurityCheckResult, SecurityDecision, SecurityPolicy
 

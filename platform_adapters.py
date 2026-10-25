@@ -69,14 +69,21 @@ class GenericAdapter(PlatformAdapter):
                     '.mantine-Loader-root, [class*="loader" i], [class*="spinner" i], [aria-busy="true"], svg[class*="animate-spin" i]'
                 );
                 for (const sp of spinners) {
-                    if (sp.offsetParent !== null) return "evaluating";
+                    // Editor loading, unrelated widgets, and the agent overlay
+                    // must not keep a completed submission in the polling loop.
+                    if (sp.closest('#__omnitasker_panel')) continue;
+                    const resultArea = sp.closest('[data-cy="submission-result"], .submission-result, .test-results, [class*="testResults" i], [class*="submissionResults" i], #output, .output-panel, .console-output, .terminal, [class*="testcase" i], [role="status"]');
+                    const control = sp.closest('button, [role="button"]');
+                    const submissionControl = control && /submit|run|judg|compil/i.test(control.innerText || control.getAttribute('aria-label') || '');
+                    if (sp.offsetParent !== null && (resultArea || submissionControl)) return "evaluating";
                 }
                 // 2. Check disabled submit button with loading indicator
                 const submitBtns = Array.from(document.querySelectorAll('button, [role="button"]'));
                 for (const btn of submitBtns) {
+                    if (btn.closest('#__omnitasker_panel') || btn.offsetParent === null) continue;
                     const txt = (btn.innerText || '').toLowerCase();
                     if (txt.includes('submit') || txt.includes('running') || txt.includes('judging')) {
-                        if (btn.hasAttribute('data-loading') || btn.classList.contains('mantine-Button-loading') || btn.getAttribute('aria-busy') === 'true') {
+                        if ((btn.hasAttribute('data-loading') && btn.getAttribute('data-loading') !== 'false') || btn.classList.contains('mantine-Button-loading') || btn.getAttribute('aria-busy') === 'true') {
                             return "evaluating";
                         }
                     }
@@ -135,6 +142,7 @@ class GenericAdapter(PlatformAdapter):
     async def parse_result(self, page: Any) -> SubmissionRecord:
         try:
             res = await page.evaluate(r"""() => {
+                const visible = el => el && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"]') && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
                 // 1. Dedicated test results containers / alerts / modals
                 const dedicatedSelectors = [
                     '[data-cy="submission-result"]', '.submission-result', '.test-results',
@@ -145,7 +153,7 @@ class GenericAdapter(PlatformAdapter):
                     '.mantine-Modal-body', '[role="dialog"]'
                 ];
                 for (const sel of dedicatedSelectors) {
-                    const el = document.querySelector(sel);
+                    const el = Array.from(document.querySelectorAll(sel)).find(visible);
                     if (el && (el.innerText || '').trim().length > 3) {
                         const txt = (el.innerText || '').trim();
                         if (/passed|failed|accepted|wrong|error|test\s*case|score|verdict/i.test(txt)) {
@@ -157,8 +165,9 @@ class GenericAdapter(PlatformAdapter):
                 // 2. Active Tab panel (EXCLUDE problem description / statement)
                 const tabPanels = Array.from(document.querySelectorAll('.mantine-Tabs-panel[data-active="true"], [role="tabpanel"]:not([hidden])'));
                 for (const panel of tabPanels) {
+                    if (!visible(panel)) continue;
                     const panelId = (panel.getAttribute('id') || panel.getAttribute('aria-labelledby') || panel.getAttribute('data-value') || '').toLowerCase();
-                    if (panelId.includes('desc') || panelId.includes('prob') || panelId.includes('stat') || panelId.includes('detail')) {
+                    if (panelId.includes('submission') || panelId.includes('history') || panelId.includes('desc') || panelId.includes('prob') || panelId.includes('stat') || panelId.includes('detail')) {
                         continue;
                     }
                     const pTxt = (panel.innerText || '').trim();
@@ -167,50 +176,28 @@ class GenericAdapter(PlatformAdapter):
                     }
                 }
 
-                // 3. Tables (Submissions table, test cases table)
-                const tables = Array.from(document.querySelectorAll('.mantine-Table-root, table'));
-                for (const tbl of tables) {
-                    const tText = (tbl.innerText || '').trim();
-                    if (tText.length > 5 && /passed|failed|accepted|wrong|error|status|verdict|score/i.test(tText)) {
-                        return tText;
-                    }
-                }
-
-                // 4. Badges (e.g. Mantine badge indicating 'Accepted' or 'Passed: 5/5')
-                const badges = Array.from(document.querySelectorAll('.mantine-Badge-root, [class*="Badge"]'));
-                const badgeTexts = badges.map(b => (b.innerText || '').trim()).filter(t => t.length > 0);
-                if (badgeTexts.length > 0) {
-                    const joined = badgeTexts.join(' | ');
-                    if (/passed|failed|accepted|wrong|error|score/i.test(joined)) {
-                        return joined;
-                    }
-                }
-
                 // 5. Output / console / terminal
                 const outputSelectors = ['#output', '.output-panel', '.console-output', '.terminal', '[class*="output" i]', '[class*="testcase" i]', '[class*="test-case" i]'];
                 for (const sel of outputSelectors) {
-                    const el = document.querySelector(sel);
+                    const el = Array.from(document.querySelectorAll(sel)).find(visible);
                     if (el && (el.innerText || '').trim().length > 3) {
                         return (el.innerText || '').trim();
                     }
                 }
 
-                // 6. Fallback: Full body ONLY IF it has explicit results
-                const bodyText = document.body ? (document.body.innerText || '') : '';
-                if (/all\s+tests?\s+passed|test\s*cases?\s*passed|wrong\s+answer|accepted/i.test(bodyText)) {
-                    return bodyText;
-                }
-                return bodyText;
+                // The problem statement, history tables, and overlay logs can all
+                // contain "Accepted". They are not the current submission result.
+                return '';
             }""")
             text = str(res) if res is not None else ""
             record = parse_test_results(text)
             record.terminal = await self.is_terminal(page)
-            if record.outcome in ("accepted", "wrong_answer", "time_limit_exceeded", "runtime_error", "compilation_error"):
-                record.terminal = True
+            if record.outcome in (None, "unknown") and record.passed_count is None:
+                record.terminal = False
             return record
         except Exception as e:
             return SubmissionRecord(
-                terminal=True,
+                terminal=False,
                 outcome="unknown",
                 raw_output=f"Error parsing result: {e}",
             )
@@ -305,25 +292,39 @@ async def wait_for_terminal(
     adapter: PlatformAdapter,
     timeout: float = 30.0,
     poll_interval: float = 1.0,
+    baseline: Optional[SubmissionRecord] = None,
 ) -> SubmissionRecord:
-    """Poll until adapter.is_terminal(page) returns True or timeout."""
-    initial_delay = min(0.5, timeout * 0.1) if timeout > 0.1 else 0.0
-    if initial_delay > 0:
-        await asyncio.sleep(initial_delay)
+    """Wait within one deadline, including browser reads; never reparse after it."""
+    record = SubmissionRecord(terminal=False, outcome="unknown")
+    if timeout <= 0:
+        return record
 
-    start_time = asyncio.get_event_loop().time()
-
-    while asyncio.get_event_loop().time() - start_time < timeout:
-        if await adapter.is_terminal(page):
+    async def poll():
+        nonlocal record
+        observed_pending = False
+        # Give the platform a chance to replace the previous verdict on submit.
+        await asyncio.sleep(min(0.5, timeout * 0.1))
+        while True:
+            # parse_result already checks terminal state. Avoid a redundant DOM
+            # round trip before each parse.
             record = await adapter.parse_result(page)
-            if record.outcome in ("accepted", "wrong_answer", "time_limit_exceeded", "runtime_error", "compilation_error") or record.passed_count is not None:
-                record.terminal = True
+            if not record.terminal:
+                observed_pending = True
+            if record.terminal and (
+                record.outcome in ("accepted", "wrong_answer", "time_limit_exceeded", "runtime_error", "compilation_error")
+                or record.passed_count is not None
+            ) and (baseline is None or observed_pending or result_fingerprint(record) != result_fingerprint(baseline)):
                 return record
-        await asyncio.sleep(poll_interval)
+            await asyncio.sleep(max(0.01, poll_interval))
 
-    record = await adapter.parse_result(page)
-    if record.outcome in ("accepted", "wrong_answer", "time_limit_exceeded", "runtime_error", "compilation_error") or (record.passed_count is not None and record.total_count is not None and record.passed_count == record.total_count):
-        record.terminal = True
-    else:
+    try:
+        return await asyncio.wait_for(poll(), timeout=timeout)
+    except asyncio.TimeoutError:
         record.terminal = False
-    return record
+        return record
+
+
+def result_fingerprint(record: SubmissionRecord) -> tuple:
+    """Compare observable verdicts, excluding locally generated IDs/timestamps."""
+    return (record.outcome, record.passed_count, record.total_count, record.failed_count,
+            ' '.join(record.raw_output.split()))

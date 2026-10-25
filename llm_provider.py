@@ -11,11 +11,12 @@ from dotenv import load_dotenv
 
 # Load local environment variables from .env file
 load_dotenv()
-from typing import Any, Mapping, Optional, Type, TypeVar
+from typing import Any, Mapping, Optional, Type, TypeVar, TYPE_CHECKING
 from browser_use.llm.openai.chat import ChatOpenAI
 from browser_use.llm.anthropic.chat import ChatAnthropic
 from browser_use.llm.google.chat import ChatGoogle
-from langchain_core.language_models.chat_models import BaseChatModel
+if TYPE_CHECKING:
+    from langchain_core.language_models.chat_models import BaseChatModel
 
 
 def repair_json(s: str) -> str:
@@ -150,32 +151,45 @@ class InterceptingCompletions:
         self._original = original_completions
         
     async def create(self, *args: Any, **kwargs: Any) -> Any:
-        response = await self._original.create(*args, **kwargs)
-        if response and response.choices:
-            choice = response.choices[0]
-            if choice.message and choice.message.content:
-                raw_text = choice.message.content
-                cleaned_text = self._clean_json(raw_text)
-                choice.message.content = cleaned_text
-        return response
-        
+        structured = bool(kwargs.get('response_format')) or '<json_schema>' in str(kwargs.get('messages', ''))
+        for attempt in range(2):
+            response = await self._original.create(*args, **kwargs)
+            if not structured:
+                return response
+            choice = response.choices[0] if response and response.choices else None
+            try:
+                if choice is None or choice.finish_reason == 'length':
+                    raise ValueError('Missing or truncated structured response')
+                choice.message.content = self._clean_json(choice.message.content or '')
+                return response
+            except (ValueError, TypeError) as exc:
+                if attempt:
+                    raise ValueError('Model returned invalid or incomplete JSON twice; no browser action was executed. ' + str(exc)) from exc
+                kwargs = dict(kwargs)
+                kwargs['messages'] = list(kwargs.get('messages', [])) + [{
+                    'role': 'user',
+                    'content': 'Your response was not complete valid JSON. Return one complete JSON object matching the supplied schema. Keep reasoning concise, escape all strings correctly, and include no markdown or commentary.',
+                }]
+
     def _clean_json(self, text: str) -> str:
-        if not text:
-            return text
+        # Remove presentation wrappers only. Never invent closing quotes/braces:
+        # that can turn truncated code into an apparently valid browser action.
+        text = text.strip()
+        fenced = re.fullmatch(r'```(?:json)?\s*([\s\S]*?)\s*```', text, re.I)
+        if fenced:
+            text = fenced.group(1)
         try:
-            return repair_json(text)
-        except Exception:
-            # Fallback to simple clean if repair fails
-            trimmed = text.strip()
-            # Remove markdown code blocks
-            m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", trimmed, re.DOTALL)
-            if m:
-                return m.group(1).strip()
-            # Match outermost curly braces
-            m = re.search(r"\{.*\}", trimmed, re.DOTALL)
-            if m:
-                return m.group(0).strip()
-            return trimmed
+            value = json.loads(text)
+        except json.JSONDecodeError:
+            start = text.find('{')
+            if start < 0:
+                raise ValueError('No JSON object in model response')
+            value, end = json.JSONDecoder().raw_decode(text[start:])
+            if text[start + end:].strip():
+                raise ValueError('Unexpected content after JSON object')
+        if not isinstance(value, dict):
+            raise ValueError('Expected one JSON object')
+        return json.dumps(value, ensure_ascii=False)
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._original, name)
@@ -327,7 +341,7 @@ def get_llm(
             )
 
         # OpenRouter uses our robust structured output bypass parameters to enable free tier models cleanly
-        return ChatOpenAI(
+        return RobustChatOpenAI(
             model=model if model else "google/gemma-4-31b-it:free",
             api_key=resolved_key,
             temperature=temperature,

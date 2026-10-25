@@ -18,6 +18,7 @@ from typing import Any, Optional
 
 from browser_use import Agent
 from devtools_perception import DevToolsPerceptionEngine
+from dom_extraction import clean_extracted_problem_text, is_loading_placeholder, is_navigation_or_overview_text
 from editor_adapters import safe_write
 from models import (
     CodingTask,
@@ -32,7 +33,7 @@ from models import (
 from platform_adapters import detect_platform
 from prompts import get_execution_system_prompt, get_execution_task_prompt
 from state_machine import can_transition, transition
-from verification import is_submission_successful, parse_test_results
+from verification import is_submission_successful, parse_test_results, is_result_stale
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +72,26 @@ class TaskSubagent:
             orch.state.model_thinking = None
 
         browser = await orch.browser_mgr.get_browser()
+        orch._log("Reading the selected task's full description before execution...", "info")
+        async def read_statement():
+            page = await orch._get_current_page_safe(browser)
+            if page is None:
+                raise RuntimeError('Selected task page is unavailable')
+            text, _, _ = await orch._extract_problem_from_dom_direct(page)
+            text = clean_extracted_problem_text(text)
+            if (not text or is_loading_placeholder(text) or is_navigation_or_overview_text(text)
+                    or 'Solve the coding problem for' in text
+                    or text.strip().casefold() == (task.platform_task.title or '').strip().casefold()):
+                raise RuntimeError('The full task description is unavailable; only a title or placeholder was found')
+            return text
+        try:
+            task.description = await asyncio.wait_for(read_statement(), timeout=30.0)
+        except (RuntimeError, asyncio.TimeoutError) as exc:
+            reason = str(exc) or 'Task description read timed out'
+            orch._log(reason, 'error')
+            return TaskExecutionResult(task_id=str(task.task_id), queue_index=task.queue_index,
+                                       success=False, output_message=reason, error_log=[reason])
+        orch._log(f"Full task description captured ({len(task.description)} characters): {task.description[:180]}", "success")
         llm = orch._get_llm_instance() if hasattr(orch, "_get_llm_instance") else None
         if llm is None:
             from llm_provider import get_llm
@@ -107,6 +128,7 @@ class TaskSubagent:
 
         # 2. Reference images handling for frontend tasks
         ref_images_prompt_section = ""
+        initial_actions = []
         if orch._is_frontend_task(task) and getattr(browser, "is_cdp_connected", False):
             orch._log("🎨 Frontend task detected — extracting reference images...", "info")
             try:
@@ -119,8 +141,22 @@ class TaskSubagent:
                         f"\n\n🎨 REFERENCE IMAGES PRE-EXTRACTED (AUTOMATICALLY SAVED TO DISK):\n"
                         f"Inspect design mockups at:\n{paths_list}\n"
                     )
+                else:
+                    initial_actions = [{"read_code_from_editor": {}}]
+                    orch._log("Reference check complete. Reading the editor and continuing from the written requirements.", "info")
+                    ref_images_prompt_section = (
+                        "\n\nREFERENCE CHECK COMPLETE: No usable reference images are available. "
+                        "Do not repeat extraction or wait for a mockup. Read the editor boilerplate "
+                        "and implement the written requirements now. Use reasonable design choices "
+                        "where unspecified, and verify the rendered preview after coding.\n"
+                    )
             except Exception as e:
+                initial_actions = [{"read_code_from_editor": {}}]
                 orch._log(f"⚠️ Pre-extraction of reference images note: {e}", "warn")
+                ref_images_prompt_section = (
+                    "\n\nReference inspection is unavailable. Continue from the written requirements; "
+                    "do not wait for an image or repeat extraction.\n"
+                )
 
         # 3. Build scoped system and task prompt (clean context window)
         budgets_dict = {
@@ -163,6 +199,11 @@ class TaskSubagent:
         # 4. Instantiate isolated browser-use Agent
         agent = Agent(
             task=exec_task,
+            # The orchestrator has already selected the task. Prevent URL
+            # extraction from the prompt from scheduling an initial navigation.
+            initial_actions=initial_actions,
+            directly_open_url=False,
+            max_failures=1,
             llm=llm,
             browser=browser,
             controller=controller,
@@ -170,7 +211,6 @@ class TaskSubagent:
             # Recheck workspace scope between actions, including clicks that
             # unexpectedly open a reference or redirect the current tab.
             max_actions_per_step=1,
-            step_timeout=3600,
             register_new_step_callback=orch._on_agent_step,
             use_vision=orch.use_vision,
         )
@@ -179,10 +219,20 @@ class TaskSubagent:
         history = None
         recovered_success = False
 
+        async def step_start(current_agent):
+            orch._log("Preparing the current page and requesting the model's next action...", "info")
+
+        async def step_end(current_agent):
+            for result in getattr(current_agent.state, 'last_result', []) or []:
+                if getattr(result, 'error', None):
+                    orch._log(f"Execution step failed: {result.error}", "error")
+
         try:
             self.lifecycle_state = SubagentLifecycleState.RUNNING
             self._current_agent = agent
-            self._current_task_future = asyncio.create_task(agent.run(max_steps=60))
+            self._current_task_future = asyncio.create_task(agent.run(
+                max_steps=60, on_step_start=step_start, on_step_end=step_end,
+            ))
             orch._current_agent_task = self._current_task_future
             history = await self._current_task_future
         except asyncio.CancelledError:
@@ -211,12 +261,27 @@ class TaskSubagent:
             orch._current_agent = None
             self._current_agent = None
 
+        # No code was changed: this is an execution/provider failure, not a code
+        # repair. Return its real cause before optional browser diagnostics.
+        errors = [str(e) for e in (history.errors() if history else []) if e]
+        invalid_model_response = any(
+            marker in error.lower() for error in errors
+            for marker in ('json_invalid', 'invalid or incomplete json', 'invalid json')
+        )
+        if not recovered_success and not getattr(orch, '_task_completed_successfully', False) and (
+            not getattr(orch, '_code_written_in_current_task', False) or invalid_model_response
+        ):
+            reason = errors[-1] if errors else 'Agent stopped without writing code or submitting a solution'
+            return TaskExecutionResult(task_id=str(task.task_id), queue_index=task.queue_index,
+                                       success=False, error_log=errors, output_message=reason)
+
         # 5. Extract multimodal observation evidence via DevTools perception
         page = await orch._get_current_page_safe(browser)
         multimodal_obs = None
         if page is not None:
             try:
-                multimodal_obs = await self.perception_engine.capture_multimodal_observation(browser, page)
+                multimodal_obs = await asyncio.wait_for(
+                    self.perception_engine.capture_multimodal_observation(browser, page), timeout=10.0)
             except Exception as obs_err:
                 logger.debug(f"[TaskSubagent] Multimodal observation capture note: {obs_err}")
 
@@ -289,7 +354,7 @@ class TaskSubagent:
                 logger.debug(f"[TaskSubagent] Fallback code injection note: {fb_err}")
 
         # Check submissions recorded
-        if task.submissions and any(is_submission_successful(s) for s in task.submissions):
+        if task.submissions and (is_submission_successful(task.submissions[-1]) and not is_result_stale(task.submissions[-1], task)):
             return TaskExecutionResult(
                 task_id=str(task.task_id),
                 queue_index=task.queue_index,
@@ -301,59 +366,8 @@ class TaskSubagent:
                 output_message="Submission confirmed accepted",
             )
 
-        # Final live DOM check
-        if page is not None:
-            try:
-                adapter = await detect_platform(page)
-                live_record = await adapter.parse_result(page)
-                live_record.task_id = str(task.task_id)
-                if task.solution_code:
-                    live_record.code_hash = hashlib.sha256(task.solution_code.encode("utf-8")).hexdigest()[:16]
-                if is_submission_successful(live_record):
-                    orch._log("✅ Live DOM verification: submission passed!", "success")
-                    task.submissions.append(live_record)
-                    return TaskExecutionResult(
-                        task_id=str(task.task_id),
-                        queue_index=task.queue_index,
-                        success=True,
-                        solution_code=task.solution_code,
-                        submissions=task.submissions,
-                        verification=task.verification,
-                        multimodal_evidence=multimodal_obs,
-                        output_message="Verified passing via live platform DOM",
-                    )
-            except Exception:
-                pass
-
-        # Text parse fallback
-        if history:
-            result_text = history.final_result() or ""
-            extracted = history.extracted_content() or []
-            parsed_record = parse_test_results(result_text + " " + " ".join(extracted))
-            if is_submission_successful(parsed_record):
-                return TaskExecutionResult(
-                    task_id=str(task.task_id),
-                    queue_index=task.queue_index,
-                    success=True,
-                    solution_code=task.solution_code,
-                    submissions=task.submissions,
-                    verification=task.verification,
-                    multimodal_evidence=multimodal_obs,
-                    output_message="Parsed successful submission from agent output",
-                )
-
-        # If code was written and agent finished without error
-        if history and history.is_done() and getattr(orch, "_code_written_in_current_task", False):
-            return TaskExecutionResult(
-                task_id=str(task.task_id),
-                queue_index=task.queue_index,
-                success=True,
-                solution_code=task.solution_code,
-                submissions=task.submissions,
-                verification=task.verification,
-                multimodal_evidence=multimodal_obs,
-                output_message="Completed code execution successfully",
-            )
+        # Model prose, done(), and writing code are not submission evidence.
+        # Only records verified by the submission actions can advance the queue.
 
         return TaskExecutionResult(
             task_id=str(task.task_id),

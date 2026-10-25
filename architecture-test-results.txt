@@ -1,0 +1,396 @@
+test_axtree_fallback (test_antigravity_architecture.TestAntigravityArchitecture.test_axtree_fallback) ... ok
+test_bounded_recovery_axtree (test_antigravity_architecture.TestAntigravityArchitecture.test_bounded_recovery_axtree) ... ok
+test_multi_signal_failure_classification (test_antigravity_architecture.TestAntigravityArchitecture.test_multi_signal_failure_classification) ... ok
+test_multimodal_snapshot (test_antigravity_architecture.TestAntigravityArchitecture.test_multimodal_snapshot) ... ok
+test_security_gate_auth_exemptions (test_antigravity_architecture.TestAntigravityArchitecture.test_security_gate_auth_exemptions) ... ok
+test_security_gate_layer1_denylist (test_antigravity_architecture.TestAntigravityArchitecture.test_security_gate_layer1_denylist) ... ok
+test_security_gate_layer2_target_and_subdomains (test_antigravity_architecture.TestAntigravityArchitecture.test_security_gate_layer2_target_and_subdomains) ... ok
+test_security_gate_unknown_external_domain_needs_approval (test_antigravity_architecture.TestAntigravityArchitecture.test_security_gate_unknown_external_domain_needs_approval) ... ok
+test_task_execution_result_contract (test_antigravity_architecture.TestAntigravityArchitecture.test_task_execution_result_contract) ... ok
+test_task_subagent_initialization (test_antigravity_architecture.TestAntigravityArchitecture.test_task_subagent_initialization) ... ok
+test_ace_adapter (test_editor_adapters.TestEditorAdapters.test_ace_adapter) ... ok
+test_codemirror5_adapter (test_editor_adapters.TestEditorAdapters.test_codemirror5_adapter) ... ok
+test_codemirror6_adapter (test_editor_adapters.TestEditorAdapters.test_codemirror6_adapter) ... ok
+test_detect_editor_priority (test_editor_adapters.TestEditorAdapters.test_detect_editor_priority) ... ok
+test_monaco_adapter_snapshot_and_write (test_editor_adapters.TestEditorAdapters.test_monaco_adapter_snapshot_and_write) ... ok
+test_monaco_bundled_dom_fallback (test_editor_adapters.TestEditorAdapters.test_monaco_bundled_dom_fallback) ... ok
+test_safe_write_cycle (test_editor_adapters.TestEditorAdapters.test_safe_write_cycle) ... ok
+test_safe_write_failover_to_next_adapter (test_editor_adapters.TestEditorAdapters.test_safe_write_failover_to_next_adapter) ... ok
+test_safe_write_newline_normalization (test_editor_adapters.TestEditorAdapters.test_safe_write_newline_normalization) ... ok
+test_safe_write_rejects_tiny_substring_readback (test_editor_adapters.TestEditorAdapters.test_safe_write_rejects_tiny_substring_readback) ... ok
+test_textarea_adapter (test_editor_adapters.TestEditorAdapters.test_textarea_adapter) ... ok
+test_textarea_adapter_filters_editor_internals (test_editor_adapters.TestEditorAdapters.test_textarea_adapter_filters_editor_internals) ... ok
+test_textarea_adapter_ignores_monaco_internal_inputarea (test_editor_adapters.TestEditorAdapters.test_textarea_adapter_ignores_monaco_internal_inputarea) ... ok
+test_is_section_header_text_discrimination (test_instant_advance.TestInstantDeterministicAdvance.test_is_section_header_text_discrimination)
+Verify _is_section_header_text accurately identifies section headers vs leaf coding problems. ... ok
+test_on_agent_step_cancels_immediately_when_completed (test_instant_advance.TestInstantDeterministicAdvance.test_on_agent_step_cancels_immediately_when_completed) ... ok
+test_on_agent_step_cancels_when_last_report_success (test_instant_advance.TestInstantDeterministicAdvance.test_on_agent_step_cancels_when_last_report_success) ... ok
+test_report_task_result_success_triggers_advance (test_instant_advance.TestInstantDeterministicAdvance.test_report_task_result_success_triggers_advance) ... INFO     [service] Using anonymized telemetry, see https://docs.browser-use.com/development/monitoring/telemetry.
+ok
+test_sequential_multi_task_execution_clears_stale_flags (test_instant_advance.TestInstantDeterministicAdvance.test_sequential_multi_task_execution_clears_stale_flags)
+Verify that completing Task 1 does not prematurely abort Task 2 due to stale state. ... ok
+test_solve_and_verify_returns_true_on_cancelled_after_success (test_instant_advance.TestInstantDeterministicAdvance.test_solve_and_verify_returns_true_on_cancelled_after_success) ... ok
+test_submit_code_solution_success_triggers_advance (test_instant_advance.TestInstantDeterministicAdvance.test_submit_code_solution_success_triggers_advance) ... ok
+test_thinking_suppressed_in_logs_after_success (test_instant_advance.TestInstantDeterministicAdvance.test_thinking_suppressed_in_logs_after_success) ... ok
+test_verify_submission_status_success_triggers_advance (test_instant_advance.TestInstantDeterministicAdvance.test_verify_submission_status_success_triggers_advance) ... ok
+test_budgets_decrement_and_exhaustion (test_models.TestModelsV2.test_budgets_decrement_and_exhaustion) ... ok
+test_coding_task_creation_and_defaults (test_models.TestModelsV2.test_coding_task_creation_and_defaults) ... ok
+test_from_v1_dict (test_models.TestModelsV2.test_from_v1_dict) ... ok
+test_v1_compatibility_properties (test_models.TestModelsV2.test_v1_compatibility_properties) ... ok
+test_workspace_snapshot_hashing (test_models.TestModelsV2.test_workspace_snapshot_hashing) ... ok
+test_available_images_remain_available_to_the_agent (test_optional_reference_images.TestOptionalReferenceImages.test_available_images_remain_available_to_the_agent) ... ok
+test_changed_statement_is_rechecked (test_optional_reference_images.TestOptionalReferenceImages.test_changed_statement_is_rechecked) ... ok
+test_empty_result_is_cached_instead_of_repeatedly_scanning (test_optional_reference_images.TestOptionalReferenceImages.test_empty_result_is_cached_instead_of_repeatedly_scanning) ... ok
+test_extraction_failure_does_not_block_coding (test_optional_reference_images.TestOptionalReferenceImages.test_extraction_failure_does_not_block_coding) ... ok
+test_next_task_gets_its_own_image_check (test_optional_reference_images.TestOptionalReferenceImages.test_next_task_gets_its_own_image_check) ... ok
+test_timeout_returns_optional_empty_result (test_optional_reference_images.TestOptionalReferenceImages.test_timeout_returns_optional_empty_result) ... ok
+test_user_cancellation_is_not_swallowed (test_optional_reference_images.TestOptionalReferenceImages.test_user_cancellation_is_not_swallowed) ... ok
+test_execution_does_not_require_a_mockup (test_optional_reference_images.TestOptionalReferencePrompts.test_execution_does_not_require_a_mockup) ... ok
+test_recon_can_complete_without_images (test_optional_reference_images.TestOptionalReferencePrompts.test_recon_can_complete_without_images) ... ok
+test_agent_orchestrator_init_has_injecting_pages (test_overlay.TestOverlay.test_agent_orchestrator_init_has_injecting_pages) ... ok
+test_consume_suggestions_block_formats_and_clears (test_overlay.TestOverlay.test_consume_suggestions_block_formats_and_clears) ... ok
+test_execute_single_task_defensive_body_text_fallback (test_overlay.TestOverlay.test_execute_single_task_defensive_body_text_fallback) ... ERROR
+test_execute_single_task_polling_re_extraction (test_overlay.TestOverlay.test_execute_single_task_polling_re_extraction) ... ERROR
+test_expand_script_protects_child_navlinks (test_overlay.TestOverlay.test_expand_script_protects_child_navlinks) ... ok
+test_extract_problem_description_action_no_nameerror (test_overlay.TestOverlay.test_extract_problem_description_action_no_nameerror) ... ok
+test_extract_problem_from_dom_direct_includes_mantine_selectors (test_overlay.TestOverlay.test_extract_problem_from_dom_direct_includes_mantine_selectors) ... FAIL
+test_fast_recon_mentorpick_chapter_autoclick (test_overlay.TestOverlay.test_fast_recon_mentorpick_chapter_autoclick) ... ERROR
+test_fast_recon_single_question_creates_task_queue (test_overlay.TestOverlay.test_fast_recon_single_question_creates_task_queue) ... ERROR
+test_get_current_page_safe_auto_reconnects_when_cdp_disconnected (test_overlay.TestOverlay.test_get_current_page_safe_auto_reconnects_when_cdp_disconnected) ... ERROR
+test_inject_overlay_defensive_injecting_pages_attribute (test_overlay.TestOverlay.test_inject_overlay_defensive_injecting_pages_attribute) ... ok
+test_inject_overlay_discards_injecting_pages_guard (test_overlay.TestOverlay.test_inject_overlay_discards_injecting_pages_guard) ... ok
+test_inject_overlay_skips_internal_pages (test_overlay.TestOverlay.test_inject_overlay_skips_internal_pages) ... ok
+test_inject_overlay_trusted_types_and_cdp_js_execution (test_overlay.TestOverlay.test_inject_overlay_trusted_types_and_cdp_js_execution) ... ok
+test_navigate_to_task_question_accordion_expansion (test_overlay.TestOverlay.test_navigate_to_task_question_accordion_expansion) ... ok
+test_navigate_to_task_question_matches_by_title (test_overlay.TestOverlay.test_navigate_to_task_question_matches_by_title) ... ok
+test_navigation_script_matches_numbered_keys (test_overlay.TestOverlay.test_navigation_script_matches_numbered_keys)
+Verify navigation regex patterns match numbered question tabs like '2. Reverse Array'. ... ok
+test_overlay_floating_pill_lifecycle_in_browser (test_overlay.TestOverlay.test_overlay_floating_pill_lifecycle_in_browser) ... ERROR
+test_overlay_panel_html_structure (test_overlay.TestOverlay.test_overlay_panel_html_structure) ... ok
+test_overlay_safe_sync_overlay_method_exists (test_overlay.TestOverlay.test_overlay_safe_sync_overlay_method_exists) ... ok
+test_overlay_starts_in_expanded_mode_with_rounded_square_pill (test_overlay.TestOverlay.test_overlay_starts_in_expanded_mode_with_rounded_square_pill) ... ok
+test_run_recon_defensive_dom_recovery_on_agent_error (test_overlay.TestOverlay.test_run_recon_defensive_dom_recovery_on_agent_error) ... ERROR
+test_run_recon_prefers_browser_navigate_to_with_page_goto_fallback (test_overlay.TestOverlay.test_run_recon_prefers_browser_navigate_to_with_page_goto_fallback) ... ERROR
+test_safe_sync_overlay_reinjects_when_panel_missing (test_overlay.TestOverlay.test_safe_sync_overlay_reinjects_when_panel_missing) ... ok
+test_section_expansion_and_multi_problem_cataloguing (test_overlay.TestOverlay.test_section_expansion_and_multi_problem_cataloguing)
+Verify that multi-problem section is catalogued into individual CodingTasks and preserves completed status. ... ERROR
+test_sync_overlay_state_ensures_display_flex (test_overlay.TestOverlay.test_sync_overlay_state_ensures_display_flex) ... FAIL
+test_with_overlay_hidden_restores_display (test_overlay.TestOverlay.test_with_overlay_hidden_restores_display) ... ok
+test_commands_are_dispatched_in_order_without_losing_suggestions (test_overlay_commands.TestOverlayCommands.test_commands_are_dispatched_in_order_without_losing_suggestions) ... ok
+test_legacy_single_command_is_supported (test_overlay_commands.TestOverlayCommands.test_legacy_single_command_is_supported) ... ok
+test_serialized_queue_is_supported (test_overlay_commands.TestOverlayCommands.test_serialized_queue_is_supported) ... ok
+test_stop_cancels_work_and_releases_pause (test_overlay_commands.TestOverlayCommands.test_stop_cancels_work_and_releases_pause) ... ok
+test_generic_adapter_terminal_detection (test_platform_adapters.TestPlatformAdapters.test_generic_adapter_terminal_detection) ... ok
+test_wait_for_terminal_timeout (test_platform_adapters.TestPlatformAdapters.test_wait_for_terminal_timeout) ... ok
+test_completed_result_returns_without_extra_terminal_read (test_platform_adapters.TestSubmissionPolling.test_completed_result_returns_without_extra_terminal_read) ... ok
+test_hung_browser_read_is_bounded_and_not_retried_after_timeout (test_platform_adapters.TestSubmissionPolling.test_hung_browser_read_is_bounded_and_not_retried_after_timeout) ... ok
+test_partial_results_while_busy_are_not_terminal (test_platform_adapters.TestSubmissionPolling.test_partial_results_while_busy_are_not_terminal) ... ok
+test_unrecognized_output_is_not_a_failed_terminal_verdict (test_platform_adapters.TestSubmissionPolling.test_unrecognized_output_is_not_a_failed_terminal_verdict) ... ok
+test_user_cancellation_propagates (test_platform_adapters.TestSubmissionPolling.test_user_cancellation_propagates) ... ok
+test_build_tasks_from_candidates_binds_to_active_question (test_recon_and_dom.TestReconAndDom.test_build_tasks_from_candidates_binds_to_active_question) ... ok
+test_clean_extracted_problem_text_on_composite_sum_digits_dump (test_recon_and_dom.TestReconAndDom.test_clean_extracted_problem_text_on_composite_sum_digits_dump) ... ok
+test_duplicate_candidates_merge_evidence_before_indexing (test_recon_and_dom.TestReconAndDom.test_duplicate_candidates_merge_evidence_before_indexing) ... ok
+test_extract_guards_overview (test_recon_and_dom.TestReconAndDom.test_extract_guards_overview) ... ok
+test_extract_problem_from_dom_with_json_strings (test_recon_and_dom.TestReconAndDom.test_extract_problem_from_dom_with_json_strings) ... ok
+test_is_navigation_or_overview_text_chrome_patterns (test_recon_and_dom.TestReconAndDom.test_is_navigation_or_overview_text_chrome_patterns) ... ok
+test_is_navigation_or_overview_text_real_problems (test_recon_and_dom.TestReconAndDom.test_is_navigation_or_overview_text_real_problems) ... ok
+test_is_navigation_or_overview_text_user_dump (test_recon_and_dom.TestReconAndDom.test_is_navigation_or_overview_text_user_dump) ... ok
+test_is_section_header_text (test_recon_and_dom.TestReconAndDom.test_is_section_header_text) ... ok
+test_model_duplicate_statements_ignore_generated_task_numbers (test_recon_and_dom.TestReconAndDom.test_model_duplicate_statements_ignore_generated_task_numbers) ... ok
+test_needs_nav_query_params (test_recon_and_dom.TestReconAndDom.test_needs_nav_query_params) ... ok
+test_observed_single_question_overrides_multiple_model_tasks (test_recon_and_dom.TestReconAndDom.test_observed_single_question_overrides_multiple_model_tasks) ... ok
+test_parse_eval_result_handles_browser_use_json_strings (test_recon_and_dom.TestReconAndDom.test_parse_eval_result_handles_browser_use_json_strings) ... ok
+test_same_title_at_distinct_destinations_is_not_merged (test_recon_and_dom.TestReconAndDom.test_same_title_at_distinct_destinations_is_not_merged) ... ok
+test_task_queue_section_expansion_skips_header (test_recon_and_dom.TestReconAndDom.test_task_queue_section_expansion_skips_header) ... ok
+test_prohibited_call_eval_rejected (test_skill_validation.TestSkillValidation.test_prohibited_call_eval_rejected) ... WARNING  [skill_validation] Skill 'evil_eval' rejected: ['Prohibited call: eval()']
+ok
+test_prohibited_import_rejected (test_skill_validation.TestSkillValidation.test_prohibited_import_rejected) ... WARNING  [skill_validation] Skill 'shell_skill' rejected: ['Prohibited import: subprocess', 'Prohibited attribute call: subprocess.run()']
+ok
+test_prohibited_os_system_rejected (test_skill_validation.TestSkillValidation.test_prohibited_os_system_rejected) ... WARNING  [skill_validation] Skill 'evil_os' rejected: ['Prohibited attribute call: os.system()']
+ok
+test_safe_skill_passes_review (test_skill_validation.TestSkillValidation.test_safe_skill_passes_review) ... INFO     [skill_validation] Skill 'safe_helper' passed static review
+INFO     [skill_validation] Skill 'safe_helper' v1 approved for production use
+ok
+test_syntax_error_rejected (test_skill_validation.TestSkillValidation.test_syntax_error_rejected) ... WARNING  [skill_validation] Skill 'bad_syntax' rejected: syntax error: invalid syntax (<unknown>, line 1)
+ok
+test_initial_navigation_and_exact_url_reuse (test_startup_lifecycle.StartupTests.test_initial_navigation_and_exact_url_reuse) ... ok
+test_navigation_failure_propagates (test_startup_lifecycle.StartupTests.test_navigation_failure_propagates) ... ok
+test_profile_locks_preserved_and_shared_instance (test_startup_lifecycle.StartupTests.test_profile_locks_preserved_and_shared_instance) ... ok
+test_resume_from_ui_thread_wakes_agent (test_startup_lifecycle.StartupTests.test_resume_from_ui_thread_wakes_agent) ... ok
+test_similar_prefix_and_different_hash_require_navigation (test_startup_lifecycle.StartupTests.test_similar_prefix_and_different_hash_require_navigation) ... ok
+test_start_failure_propagates_before_navigation (test_startup_lifecycle.StartupTests.test_start_failure_propagates_before_navigation) ... ok
+test_invalid_input_rejected (test_startup_lifecycle.URLTests.test_invalid_input_rejected) ... ok
+test_local_and_remote_defaults (test_startup_lifecycle.URLTests.test_local_and_remote_defaults) ... ok
+test_initial_state (test_state_machine.TestStateMachine.test_initial_state) ... ok
+test_invalid_transition_raises_error (test_state_machine.TestStateMachine.test_invalid_transition_raises_error) ... ok
+test_repair_loop (test_state_machine.TestStateMachine.test_repair_loop) ... ok
+test_supervisory_transitions (test_state_machine.TestStateMachine.test_supervisory_transitions) ... ok
+test_terminal_state_cannot_be_left (test_state_machine.TestStateMachine.test_terminal_state_cannot_be_left) ... ok
+test_valid_forward_flow (test_state_machine.TestStateMachine.test_valid_forward_flow) ... ok
+test_failed_write_does_not_submit_or_wait (test_submission_actions.TestSubmissionActions.test_failed_write_does_not_submit_or_wait) ... ok
+test_missing_submit_control_does_not_wait_for_results (test_submission_actions.TestSubmissionActions.test_missing_submit_control_does_not_wait_for_results) ... ok
+test_expired_window_does_not_touch_browser (test_submission_deadlines.SubmissionDeadlineTests.test_expired_window_does_not_touch_browser) ... ok
+test_hung_read_returns_without_navigation (test_submission_deadlines.SubmissionDeadlineTests.test_hung_read_returns_without_navigation) ... ok
+test_unknown_result_does_not_claim_tests_running (test_submission_deadlines.SubmissionDeadlineTests.test_unknown_result_does_not_claim_tests_running) ... ok
+test_consume_suggestions_block_active (test_suggestions_and_actions.TestSuggestionsAndActions.test_consume_suggestions_block_active) ... ok
+test_consume_suggestions_block_empty (test_suggestions_and_actions.TestSuggestionsAndActions.test_consume_suggestions_block_empty) ... ok
+test_consume_suggestions_block_inline (test_suggestions_and_actions.TestSuggestionsAndActions.test_consume_suggestions_block_inline) ... ok
+test_consume_suggestions_block_none_flags (test_suggestions_and_actions.TestSuggestionsAndActions.test_consume_suggestions_block_none_flags) ... ok
+test_describe_page_visuals_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_describe_page_visuals_page_none_with_suggestions) ... ok
+test_describe_page_visuals_screenshot_error_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_describe_page_visuals_screenshot_error_with_suggestions) ... ok
+test_execute_learned_skill_exception_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_execute_learned_skill_exception_with_suggestions) ... ok
+test_execute_learned_skill_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_execute_learned_skill_page_none_with_suggestions) ... ok
+test_extract_and_view_reference_images_error_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_and_view_reference_images_error_with_suggestions) ... FAIL
+test_extract_problem_description_dom_error_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_problem_description_dom_error_with_suggestions) ... ok
+test_extract_problem_description_no_suggestions_no_name_error (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_problem_description_no_suggestions_no_name_error) ... ok
+test_extract_problem_description_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_problem_description_page_none_with_suggestions) ... ok
+test_extract_problem_description_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_problem_description_with_suggestions) ... ok
+test_get_human_suggestions_active_and_empty (test_suggestions_and_actions.TestSuggestionsAndActions.test_get_human_suggestions_active_and_empty) ... ok
+test_pause_for_human_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_pause_for_human_with_suggestions) ... ok
+test_read_code_from_editor_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_read_code_from_editor_page_none_with_suggestions) ... ok
+test_report_task_result_success_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_report_task_result_success_with_suggestions) ... ok
+test_report_task_result_without_code_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_report_task_result_without_code_with_suggestions) ... ok
+test_reset_editor_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_reset_editor_page_none_with_suggestions) ... ok
+test_skip_current_task_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_skip_current_task_with_suggestions) ... ok
+test_stop_requested_raises_cancelled_in_actions (test_suggestions_and_actions.TestSuggestionsAndActions.test_stop_requested_raises_cancelled_in_actions) ... ok
+test_submit_code_solution_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_submit_code_solution_page_none_with_suggestions) ... ok
+test_verify_submission_status_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_verify_submission_status_page_none_with_suggestions) ... FAIL
+test_write_code_to_editor_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_write_code_to_editor_page_none_with_suggestions) ... ok
+test_is_result_stale (test_verification.TestVerification.test_is_result_stale) ... ok
+test_parse_test_results (test_verification.TestVerification.test_parse_test_results) ... ok
+test_post_write_snapshot_verification_workflow (test_verification.TestVerification.test_post_write_snapshot_verification_workflow)
+Verify that post-write snapshot hash correctly matches task.solution_code without stale error. ... ok
+test_submission_success_formula (test_verification.TestVerification.test_submission_success_formula) ... ok
+test_verify_submission_populates_missing_task_id (test_verification.TestVerification.test_verify_submission_populates_missing_task_id)
+Verify that record without explicit task_id inherits task.task_id and passes verification. ... ok
+test_asset_url_is_preserved_as_code_data (test_workspace_navigation.TestTaskNavigationPrompts.test_asset_url_is_preserved_as_code_data) ... ok
+test_multitasking_does_not_request_a_second_next_click (test_workspace_navigation.TestTaskNavigationPrompts.test_multitasking_does_not_request_a_second_next_click) ... ok
+test_different_local_port_is_not_the_workspace (test_workspace_navigation.TestWorkspaceNavigation.test_different_local_port_is_not_the_workspace) ... ok
+test_external_reference_returns_to_selected_task_not_course_root (test_workspace_navigation.TestWorkspaceNavigation.test_external_reference_returns_to_selected_task_not_course_root) ... ok
+test_failed_restore_does_not_allow_editing_external_page (test_workspace_navigation.TestWorkspaceNavigation.test_failed_restore_does_not_allow_editing_external_page) ... ok
+test_human_login_is_not_interrupted (test_workspace_navigation.TestWorkspaceNavigation.test_human_login_is_not_interrupted) ... ok
+test_recovery_reselects_task_when_platform_reuses_one_url (test_workspace_navigation.TestWorkspaceNavigation.test_recovery_reselects_task_when_platform_reuses_one_url) ... ok
+test_same_origin_image_is_also_restored (test_workspace_navigation.TestWorkspaceNavigation.test_same_origin_image_is_also_restored) ... ok
+test_step_blocks_reference_navigation_before_action (test_workspace_navigation.TestWorkspaceNavigation.test_step_blocks_reference_navigation_before_action) ... ok
+test_step_discards_stale_click_after_restoring_workspace (test_workspace_navigation.TestWorkspaceNavigation.test_step_discards_stale_click_after_restoring_workspace) ... ok
+test_workspace_navigation_is_not_reloaded (test_workspace_navigation.TestWorkspaceNavigation.test_workspace_navigation_is_not_reloaded) ... ok
+
+======================================================================
+ERROR: test_execute_single_task_defensive_body_text_fallback (test_overlay.TestOverlay.test_execute_single_task_defensive_body_text_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 876, in test_execute_single_task_defensive_body_text_fallback
+    loop.run_until_complete(orchestrator._execute_single_task(task, total_tasks=2))
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 643, in _execute_single_task
+    current_url = await page.get_url()
+                  ^^^^^^^^^^^^^^^^^^^^
+TypeError: 'MagicMock' object can't be awaited
+
+======================================================================
+ERROR: test_execute_single_task_polling_re_extraction (test_overlay.TestOverlay.test_execute_single_task_polling_re_extraction)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 779, in test_execute_single_task_polling_re_extraction
+    loop.run_until_complete(orchestrator._execute_single_task(task, total_tasks=2))
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 643, in _execute_single_task
+    current_url = await page.get_url()
+                  ^^^^^^^^^^^^^^^^^^^^
+TypeError: 'MagicMock' object can't be awaited
+
+======================================================================
+ERROR: test_fast_recon_mentorpick_chapter_autoclick (test_overlay.TestOverlay.test_fast_recon_mentorpick_chapter_autoclick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 336, in test_fast_recon_mentorpick_chapter_autoclick
+    tq = loop.run_until_complete(orchestrator._run_recon())
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 534, in _run_recon
+    return await self.recon_engine.run_recon()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\auto\recon_engine.py", line 208, in _run_recon
+    denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'security_gate'
+
+======================================================================
+ERROR: test_fast_recon_single_question_creates_task_queue (test_overlay.TestOverlay.test_fast_recon_single_question_creates_task_queue)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 377, in test_fast_recon_single_question_creates_task_queue
+    tq = loop.run_until_complete(orchestrator._run_recon())
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 534, in _run_recon
+    return await self.recon_engine.run_recon()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\auto\recon_engine.py", line 208, in _run_recon
+    denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'security_gate'
+
+======================================================================
+ERROR: test_get_current_page_safe_auto_reconnects_when_cdp_disconnected (test_overlay.TestOverlay.test_get_current_page_safe_auto_reconnects_when_cdp_disconnected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 685, in test_get_current_page_safe_auto_reconnects_when_cdp_disconnected
+    page = loop.run_until_complete(orchestrator._get_current_page_safe(browser))
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 1005, in _get_current_page_safe
+    if page is not None and self.state.phase == AgentPhase.EXECUTING:
+                            ^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'state'
+
+======================================================================
+ERROR: test_overlay_floating_pill_lifecycle_in_browser (test_overlay.TestOverlay.test_overlay_floating_pill_lifecycle_in_browser)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 546, in test_overlay_floating_pill_lifecycle_in_browser
+    from playwright.async_api import async_playwright
+ModuleNotFoundError: No module named 'playwright'
+
+======================================================================
+ERROR: test_run_recon_defensive_dom_recovery_on_agent_error (test_overlay.TestOverlay.test_run_recon_defensive_dom_recovery_on_agent_error)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 734, in test_run_recon_defensive_dom_recovery_on_agent_error
+    tq = loop.run_until_complete(orchestrator._run_recon())
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 534, in _run_recon
+    return await self.recon_engine.run_recon()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\auto\recon_engine.py", line 208, in _run_recon
+    denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'security_gate'
+
+======================================================================
+ERROR: test_run_recon_prefers_browser_navigate_to_with_page_goto_fallback (test_overlay.TestOverlay.test_run_recon_prefers_browser_navigate_to_with_page_goto_fallback)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 814, in test_run_recon_prefers_browser_navigate_to_with_page_goto_fallback
+    tq = loop.run_until_complete(orchestrator._run_recon())
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 534, in _run_recon
+    return await self.recon_engine.run_recon()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\auto\recon_engine.py", line 208, in _run_recon
+    denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'security_gate'
+
+======================================================================
+ERROR: test_section_expansion_and_multi_problem_cataloguing (test_overlay.TestOverlay.test_section_expansion_and_multi_problem_cataloguing)
+Verify that multi-problem section is catalogued into individual CodingTasks and preserves completed status.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 440, in test_section_expansion_and_multi_problem_cataloguing
+    tq = loop.run_until_complete(orchestrator._run_recon())
+  File "C:\Users\pujit\miniconda3\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "D:\auto\agent_core.py", line 534, in _run_recon
+    return await self.recon_engine.run_recon()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\auto\recon_engine.py", line 208, in _run_recon
+    denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'AgentOrchestrator' object has no attribute 'security_gate'
+
+======================================================================
+FAIL: test_extract_problem_from_dom_direct_includes_mantine_selectors (test_overlay.TestOverlay.test_extract_problem_from_dom_direct_includes_mantine_selectors)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 270, in test_extract_problem_from_dom_direct_includes_mantine_selectors
+    self.assertIn("elem.closest('nav, header, footer, [class*=\"Navbar\"], [class*=\"sidebar\"], [class*=\"nav\"]')", dom_script)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'elem.closest(\'nav, header, footer, [class*="Navbar"], [class*="sidebar"], [class*="nav"]\')' not found in '(userSelector) => {\n            function cleanText(text) {\n                if (!text) return "";\n                return text.replace(/\\r\\n/g, \'\\n\')\n                           .replace(/\\t/g, \' \')\n                           .split(\'\\n\')\n                           .map(line => line.trimEnd())\n                           .filter((line, idx, arr) => line.length > 0 || (idx > 0 && arr[idx - 1].length > 0))\n                           .join(\'\\n\')\n                           .trim();\n            }\n\n            function hasProblemMarkers(text) {\n                if (!text || typeof text !== \'string\') return false;\n                const t = text.toLowerCase();\n                let score = 0;\n                if (/\\binput\\s+format\\b/.test(t)) score += 2;\n                if (/\\boutput\\s+format\\b/.test(t)) score += 2;\n                if (/\\bexample\\s+input\\b|\\bsample\\s+input\\b/.test(t)) score += 2;\n                if (/\\bexample\\s+output\\b|\\bsample\\s+output\\b|\\boutput\\s+1\\b/.test(t)) score += 2;\n                if (/\\bconstraints?\\b/.test(t)) score += 2;\n                if (/\\bprohibited\\s+keywords?\\b/.test(t)) score += 2;\n                if (/\\bexplanation\\b/.test(t)) score += 1;\n                if (/\\bgiven\\s+(?:a|an|two|the|n)\\b/.test(t)) score += 1;\n                if (/\\binput\\s*:/.test(t) && /\\boutput\\s*:/.test(t)) score += 2;\n                if (/\\brefer\\s+to\\s+the\\s+(?:below\\s+)?image\\b|\\bdesign\\s+a\\b/.test(t)) score += 2;\n                return score >= 3;\n            }\n\n            function isNavigationOrOverviewText(text) {\n                if (!text || typeof text !== \'string\') return false;\n                const t = text.trim();\n                if (t.length < 5) return false;\n                const tLower = t.toLowerCase();\n\n                const overviewPatterns = [\n                    /\\b\\d+\\s+of\\s+\\d+\\s+complete\\b/,\n                    /\\bcomplete\\s*\\(\\d+%\\)/,\n                    /\\b(?:previous|next)\\s+chapter\\b/,\n                    /\\blearn\\s+to\\s+master\\b/,\n                    /\\btable\\s+of\\s+contents\\b/,\n                    /\\bcurriculum\\s+overview\\b/,\n                    /\\bchapter\\s+overview\\b/,\n                    /\\bmy\\s+attendance\\b/,\n                    /\\bshow\\s+qr\\b/,\n                    /\\bmy\\s+doubts\\b/,\n                    /\\bmy\\s+bookmarks\\b/,\n                    /\\bmy\\s+orders\\b/\n                ];\n                if (overviewPatterns.some(p => p.test(tLower))) return true;\n\n                const chromeKeywords = [\n                    "home", "problems", "submissions", "blogs", "compete", "courses",\n                    "profile", "logout", "log out", "sign out", "theme", "account",\n                    "leaderboard", "discussions", "announcements", "syllabus"\n                ];\n                let count = 0;\n                for (const kw of chromeKeywords) {\n                    if (new RegExp(\'\\\\b\' + kw + \'\\\\b\').test(tLower)) count++;\n                    if (count >= 3) return true;\n                }\n\n                if (/^(?:[a-zA-Z0-9_-]+\\s+)?(?:home|problems|courses|submissions|compete|blogs)\\b/i.test(tLower)) {\n                    return true;\n                }\n\n                return false;\n            }\n\n            function cleanProblemSlice(raw) {\n                if (!raw || typeof raw !== \'string\') return "";\n                let cleaned = raw.trim();\n                const mTabs = cleaned.match(/\\bDescription\\s+Submissions\\s+(?:Editorial\\s+|Solutions\\s+|Hints\\s+|Discuss(?:ions?)?\\s+)*([A-Z0-9][\\s\\S]{20,})$/);\n                if (mTabs) {\n                    cleaned = mTabs[1].trim();\n                } else {\n                    const mNext = cleaned.match(/\\bNext\\s+Chapter\\s*:\\s*[^\\n]+?(?:\\.\\.\\.|\\n)\\s*([\\s\\S]{30,})$/i);\n                    if (mNext && hasProblemMarkers(mNext[1])) {\n                        cleaned = mNext[1].trim();\n                    }\n                }\n                cleaned = cleaned.replace(/(?:\\s+\\b1\\s+2\\s+3(?:\\s+\\d+)*[\\s\u2304\ufe40\u2228v\u25b2\u25bc]*)(?:import\\s+|#include|using\\s+namespace|package\\s+|public\\s+class|class\\s+\\w+|def\\s+\\w+|function\\s+\\w+|const\\s+\\w+|let\\s+\\w+|var\\s+\\w+|int\\s+main)[\\s\\S]*$/, \'\').trim();\n                cleaned = cleaned.replace(/\\s+\\b(?:Test\\s*1\\s+)?Run\\s+Submit(?:\\s+Input\\s+Output(?:\\s+Expected\\s+Output)?)?\\.?\\s*$/i, \'\').trim();\n                if (isNavigationOrOverviewText(cleaned) && !hasProblemMarkers(cleaned)) {\n                    return "";\n                }\n                return cleaned;\n            }\n\n            function extractWithImages(el, allowSlice = false) {\n                if (!el) return null;\n                let text = cleanText(el.innerText || el.textContent || \'\');\n                if (text.length < 20) return null;\n                if (isNavigationOrOverviewText(text)) {\n                    if (allowSlice && hasProblemMarkers(text)) {\n                        text = cleanProblemSlice(text);\n                        if (!text || text.length < 20 || isNavigationOrOverviewText(text)) return null;\n                    } else {\n                        return null;\n                    }\n                }\n                const blacklistRegex = /avatar|profile|gravatar|user[-_]?pic|user[-_]?icon|user[-_]?photo|user[-_]?image|account|author|member|person|portrait|logo|favicon|badge|banner-logo|header-img|nav-logo|topbar|sidebar-user|notification/i;\n\n                function isBlacklisted(img) {\n                    let curr = img;\n                    while (curr && curr !== document.body) {\n                        const tag = curr.tagName ? curr.tagName.toLowerCase() : \'\';\n                        if ([\'nav\', \'header\', \'footer\'].includes(tag)) return true;\n\n                        const idStr = curr.id || \'\';\n                        const classStr = typeof curr.className === \'string\' ? curr.className : \'\';\n                        const altStr = curr.alt || \'\';\n                        const srcStr = curr.src || curr.getAttribute(\'src\') || \'\';\n                        const ariaStr = curr.getAttribute(\'aria-label\') || \'\';\n\n                        if (blacklistRegex.test(idStr) || blacklistRegex.test(classStr) || blacklistRegex.test(altStr) || blacklistRegex.test(srcStr) || blacklistRegex.test(ariaStr)) {\n                            return true;\n                        }\n                        curr = curr.parentElement;\n                    }\n                    return false;\n                }\n\n                const imgs = Array.from(el.querySelectorAll(\'img\'))\n                    .map(img => ({\n                        src: img.src || img.getAttribute(\'src\') || \'\',\n                        alt: img.alt || \'\',\n                        width: img.naturalWidth || img.width || 0,\n                        height: img.naturalHeight || img.height || 0,\n                        blacklisted: isBlacklisted(img)\n                    }))\n                    .filter(i => i.src && i.src.startsWith(\'http\') && !i.blacklisted && i.width >= 50 && i.height >= 50);\n                return { text: text, images: imgs };\n            }\n\n            function queryRootsAll(selector) {\n                const results = [];\n                try {\n                    results.push(...Array.from(document.querySelectorAll(selector)));\n                } catch(e) {}\n                try {\n                    const all = document.querySelectorAll(\'*\');\n                    for (let i = 0; i < all.length; i++) {\n                        if (all[i].shadowRoot) {\n                            try {\n                                results.push(...Array.from(all[i].shadowRoot.querySelectorAll(selector)));\n                            } catch(e) {}\n                        }\n                    }\n                } catch(e) {}\n                try {\n                    const iframes = document.querySelectorAll(\'iframe\');\n                    for (let i = 0; i < iframes.length; i++) {\n                        try {\n                            const doc = iframes[i].contentDocument || iframes[i].contentWindow?.document;\n                            if (doc) {\n                                results.push(...Array.from(doc.querySelectorAll(selector)));\n                            }\n                        } catch(e) {}\n                    }\n                } catch(e) {}\n                return results;\n            }\n\n            if (userSelector && typeof userSelector === \'string\' && userSelector.trim() && userSelector !== \'none\' && userSelector !== \'null\') {\n                try {\n                    const els = queryRootsAll(userSelector.trim());\n                    for (const el of els) {\n                        const result = extractWithImages(el);\n                        if (result) return result;\n                    }\n                } catch(e) {}\n            }\n\n            const selectors = [\n                \'.mantine-AppShell-main .mantine-TypographyStylesProvider-root\',\n                \'main .mantine-TypographyStylesProvider-root\',\n                \'[class*="TypographyStylesProvider"]\',\n                \'.mantine-AppShell-main [class*="TypographyStylesProvider"]\',\n                \'.mantine-Tabs-panel[data-active="true"]\',\n                \'[role="tabpanel"]\',\n                \'.mantine-Tabs-panel\',\n                \'div[data-track-load="description_content"]\',\n                \'div[class*="description__"]\',\n                \'div[class*="markdown"]\',\n                \'.markdown-body\',\n                \'.challenge-body-html\',\n                \'.challenge-description\',\n                \'.challenge-instructions\',\n                \'.problem-description\',\n                \'.question-statement\',\n                \'.question-description\',\n                \'.description-container\',\n                \'.problem-statement\',\n                \'#problem-description\',\n                \'.question-body\',\n                \'[class*="problem-description"]\',\n                \'[class*="question-statement"]\',\n                \'[class*="challenge-desc"]\',\n                \'[data-cy="problem-statement"]\',\n                \'[data-testid="problem-description"]\',\n                \'.problem-content\',\n                \'.statement-content\',\n                \'article[class*="problem"]\',\n                \'.mantine-ScrollArea-viewport\'\n            ];\n\n            // Pass 1: Look for elements matching selectors that have strong problem statement markers and NO code editor inside\n            for (const sel of selectors) {\n                try {\n                    const els = queryRootsAll(sel);\n                    for (const el of els) {\n                        if (el.closest(\'nav, header, footer, aside, .mantine-AppShell-navbar, #__omnitasker_panel\')) continue;\n                        if (el.querySelector(\'.monaco-editor, .CodeMirror, .ace_editor, .cm-editor\')) continue;\n                        const result = extractWithImages(el);\n                        if (result && hasProblemMarkers(result.text)) return result;\n                    }\n                } catch(e) {}\n            }\n\n            // Pass 2: Any element matching selectors that passes extractWithImages and doesn\'t wrap the code editor\n            for (const sel of selectors) {\n                try {\n                    const els = queryRootsAll(sel);\n                    for (const el of els) {\n                        if (el.closest(\'nav, header, footer, aside, .mantine-AppShell-navbar, #__omnitasker_panel\')) continue;\n                        if (el.querySelector(\'.monaco-editor, .CodeMirror, .ace_editor, .cm-editor\')) continue;\n                        const result = extractWithImages(el);\n                        if (result) return result;\n                    }\n                } catch(e) {}\n            }\n\n            // Pass 3: Score all content containers to find the tightest problem description container\n            let bestProblemElem = null;\n            let bestScore = -1;\n            let bestLen = Infinity;\n            try {\n                const allElems = document.querySelectorAll(\'div, section, article, main, [role="tabpanel"]\');\n                for (const elem of allElems) {\n                    if (elem.closest(\'nav, header, footer, aside, [class*="Navbar" i], [class*="sidebar" i], .mantine-AppShell-navbar, #__omnitasker_panel\')) {\n                        continue;\n                    }\n                    if (elem.closest(\'.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, textarea\')) {\n                        continue;\n                    }\n                    // Exclude parent split-pane wrappers that also wrap the code editor\n                    if (elem.querySelector(\'.monaco-editor, .CodeMirror, .ace_editor, .cm-editor\')) {\n                        continue;\n                    }\n                    const rawTxt = cleanText(elem.innerText || elem.textContent || \'\');\n                    if (rawTxt.length < 40 || rawTxt.length > 20000) continue;\n                    if (isNavigationOrOverviewText(rawTxt)) continue;\n\n                    const t = rawTxt.toLowerCase();\n                    let score = 0;\n                    if (/\\binput\\s+format\\b/.test(t)) score += 3;\n                    if (/\\boutput\\s+format\\b/.test(t)) score += 3;\n                    if (/\\bexample\\s+input\\b|\\bsample\\s+input\\b/.test(t)) score += 3;\n                    if (/\\bconstraints?\\b/.test(t)) score += 3;\n                    if (/\\bdescription\\b/.test(t)) score += 2;\n                    if (/\\bexplanation\\b/.test(t)) score += 1;\n                    if (/\\bgiven\\s+(?:a|an|two|the|n)\\b/.test(t)) score += 2;\n\n                    if (score > bestScore || (score === bestScore && score > 0 && rawTxt.length < bestLen && rawTxt.length >= 60)) {\n                        bestScore = score;\n                        bestLen = rawTxt.length;\n                        bestProblemElem = elem;\n                    }\n                }\n                if (bestProblemElem && bestScore >= 2) {\n                    const result = extractWithImages(bestProblemElem);\n                    if (result) return result;\n                }\n            } catch(e) {}\n\n            // Pass 4: Fallback to main/body with cleanProblemSlice\n            try {\n                const mainElems = queryRootsAll(\'.mantine-AppShell-main, main, [role="main"], article\');\n                for (const mainElem of mainElems) {\n                    const res = extractWithImages(mainElem, true);\n                    if (res) return res;\n                }\n\n                const bodyClone = document.body.cloneNode(true);\n                const tagsToRemove = [\n                    \'script\', \'style\', \'nav\', \'header\', \'footer\', \'aside\', \'svg\', \'iframe\', \'noscript\',\n                    \'.mantine-Header-root\', \'.mantine-AppShell-header\', \'[class*="Header" i]\', \'[class*="header" i]\',\n                    \'[class*="Topbar" i]\', \'[class*="topbar" i]\',\n                    \'.mantine-Navbar-root\', \'.mantine-AppShell-navbar\', \'[class*="navbar" i]\', \'[class*="Navbar" i]\',\n                    \'[class*="sidebar" i]\', \'[class*="Sidebar" i]\',\n                    \'.mantine-Menu-dropdown\', \'.mantine-Menu-root\', \'[role="menu"]\', \'[role="navigation"]\',\n                    \'[class*="breadcrumb" i]\', \'[class*="Breadcrumb" i]\',\n                    \'.monaco-editor\', \'.CodeMirror\', \'.ace_editor\', \'.cm-editor\',\n                    \'#__omnitasker_panel\'\n                ];\n                for (const tag of tagsToRemove) {\n                    try {\n                        const elems = bodyClone.querySelectorAll(tag);\n                        for (const el of elems) el.remove();\n                    } catch(e) {}\n                }\n                const bodyFallback = cleanProblemSlice(cleanText(bodyClone.innerText || bodyClone.textContent || \'\'));\n                if (bodyFallback.length > 0 && !isNavigationOrOverviewText(bodyFallback)) {\n                    return { text: bodyFallback, images: [] };\n                }\n                const finalFallback = cleanProblemSlice(cleanText(document.body ? (document.body.innerText || document.body.textContent || \'\') : \'\'));\n                if (finalFallback.length > 0 && !isNavigationOrOverviewText(finalFallback)) {\n                    return { text: finalFallback, images: [] };\n                }\n                return { text: "", images: [] };\n            } catch(e) {\n                return { text: "", images: [] };\n            }\n        }'
+
+======================================================================
+FAIL: test_sync_overlay_state_ensures_display_flex (test_overlay.TestOverlay.test_sync_overlay_state_ensures_display_flex)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_overlay.py", line 174, in test_sync_overlay_state_ensures_display_flex
+    self.assertTrue(len(eval_scripts) > 0)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_extract_and_view_reference_images_error_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_extract_and_view_reference_images_error_with_suggestions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_suggestions_and_actions.py", line 262, in test_extract_and_view_reference_images_error_with_suggestions
+    self.assertIn("Error: Failed to extract reference images", res)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Error: Failed to extract reference images' not found in 'Reference inspection unavailable: Disk write failed. Continue from the written requirements; do not wait for images or repeat extraction.\n\n\U0001f6a8 ACTIVE HUMAN USER DIRECTIVES (YOU MUST SOLVE AND COMPLY WITH THESE IMMEDIATELY):\n- Extract images carefully'
+
+======================================================================
+FAIL: test_verify_submission_status_page_none_with_suggestions (test_suggestions_and_actions.TestSuggestionsAndActions.test_verify_submission_status_page_none_with_suggestions)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\auto\tests\test_suggestions_and_actions.py", line 208, in test_verify_submission_status_page_none_with_suggestions
+    self.assertIn("Active page unavailable to check submission status.", res)
+    ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 'Active page unavailable to check submission status.' not found in 'Error verifying submission status: Active page unavailable\n\n\U0001f6a8 ACTIVE HUMAN USER DIRECTIVES (YOU MUST SOLVE AND COMPLY WITH THESE IMMEDIATELY):\n- Check test case 4'
+
+----------------------------------------------------------------------
+Ran 163 tests in 4.498s
+
+FAILED (failures=4, errors=9)
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Building browser with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=False
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True
+[BrowserManager] Initialized with headless=True

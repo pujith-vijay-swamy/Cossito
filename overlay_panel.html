@@ -694,9 +694,44 @@
 #__omnitasker_panel .__ot_body::-webkit-scrollbar-thumb, #__omnitasker_panel .__ot_logs_box::-webkit-scrollbar-thumb, #__omnitasker_panel .__ot_tasks_list::-webkit-scrollbar-thumb { background: #736182 !important; border: none !important; }
 #__omnitasker_panel.__ot_collapsed_ball { border: 2px solid #e9ff69 !important; box-shadow: 4px 4px 0 #050507 !important; border-radius: 9px !important; }
 #__omnitasker_panel.__ot_collapsed_ball .__ot_collapse_btn { border: none !important; color: #e9ff69 !important; background: transparent !important; box-shadow: none !important; }
+/* Minimized Cossito emblem: geometry and event targets are unchanged. */
+#__omnitasker_panel.__ot_collapsed_ball {
+  --dock-color: #c1a0ff; --dock-speed: 18s;
+  isolation: isolate !important; border: 1px solid #fffbed80 !important;
+  box-shadow: 4px 5px 0 #050507, 0 8px 26px #00000045 !important;
+  animation: none !important; transform: none !important;
+  transition: box-shadow .25s ease !important;
+}
+#__omnitasker_panel.__ot_collapsed_ball.--phase-recon { --dock-color: #94d5ff; --dock-speed: 10s; }
+#__omnitasker_panel.__ot_collapsed_ball.--phase-exec { --dock-color: #e9ff69; --dock-speed: 6s; }
+#__omnitasker_panel.__ot_collapsed_ball.--phase-paused { --dock-color: #ffb078; --dock-speed: 12s; }
+#__omnitasker_panel.__ot_collapsed_ball.--phase-error { --dock-color: #ff8b98; --dock-speed: 12s; }
+#__omnitasker_panel.__ot_collapsed_ball.--phase-done { --dock-color: #b9f887; --dock-speed: 18s; }
+#__omnitasker_panel.__ot_collapsed_ball[class*="--phase-"] { animation: none !important; border-color: #fffbed80 !important; box-shadow: 4px 5px 0 #050507, 0 8px 26px #00000045 !important; }
+#__omnitasker_panel.__ot_collapsed_ball::before {
+  content: '' !important; position: absolute !important; inset: -45% !important; z-index: 0 !important; pointer-events: none !important;
+  background: conic-gradient(from 45deg, #352840 0deg, var(--dock-color) 90deg, #ff855e 140deg, #352840 180deg, #c1a0ff 260deg, var(--dock-color) 310deg, #352840 360deg) !important;
+  animation: __ot_dock_orbit var(--dock-speed) linear infinite !important;
+}
+#__omnitasker_panel.__ot_collapsed_ball::after {
+  content: '' !important; position: absolute !important; inset: 3px !important; z-index: 1 !important; pointer-events: none !important;
+  background: radial-gradient(circle at 20% 0%, #493356, #19121f 70%) !important;
+  border: 1px solid #ffffff20 !important; border-radius: 10px !important;
+}
+#__omnitasker_panel.__ot_collapsed_ball .__ot_titlebar { position: relative !important; z-index: 2 !important; }
+#__omnitasker_panel.__ot_collapsed_ball .__ot_collapse_btn { position: relative !important; color: var(--dock-color) !important; overflow: visible !important; }
+#__omnitasker_panel.__ot_collapsed_ball .__ot_collapse_btn::after {
+  content: '' !important; position: absolute !important; bottom: 6px !important; right: 6px !important; width: 5px !important; height: 5px !important;
+  border-radius: 50% !important; background: var(--dock-color) !important; box-shadow: 0 0 8px var(--dock-color) !important; pointer-events: none !important;
+}
+#__omnitasker_panel.__ot_collapsed_ball .__ot_icon_expand svg { width: 30px !important; height: 30px !important; filter: drop-shadow(2px 2px 0 #00000080) !important; transition: transform .25s ease !important; }
+#__omnitasker_panel.__ot_collapsed_ball:hover, #__omnitasker_panel.__ot_collapsed_ball[class*="--phase-"]:hover { transform: none !important; box-shadow: 4px 5px 0 #050507, 0 0 22px #c1a0ff65 !important; }
+#__omnitasker_panel.__ot_collapsed_ball:hover .__ot_icon_expand svg { transform: rotate(-10deg) scale(1.08) !important; }
+#__omnitasker_panel.__ot_collapsed_ball:focus-within { outline: 2px solid #fffbed !important; outline-offset: 3px !important; }
+@keyframes __ot_dock_orbit { to { transform: rotate(360deg); } }
 @keyframes __ot_cinema_flow { to { background-position: 53px 0; } }
 @media (max-width: 480px) { #__omnitasker_panel .__ot_body { max-height: calc(100dvh - 110px) !important; } }
-@media (prefers-reduced-motion: reduce) { #__omnitasker_panel, #__omnitasker_panel *, #__omnitasker_panel *::before, #__omnitasker_panel *::after { animation: none !important; transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { #__omnitasker_panel, #__omnitasker_panel::before, #__omnitasker_panel::after, #__omnitasker_panel.__ot_collapsed_ball::before, #__omnitasker_panel *, #__omnitasker_panel *::before, #__omnitasker_panel *::after { animation: none !important; transition: none !important; } }
 
 </style>
 
@@ -708,14 +743,10 @@
     <span class="__ot_spacer"></span>
     <button class="__ot_collapse_btn" id="__ot_collapse_btn" title="Toggle panel">
       <span class="__ot_icon_expand">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Robot Head -->
-          <path d="M4 9C4 7.89543 4.89543 7 6 7H18C19.1046 7 20 7.89543 20 9V17C20 18.1046 19.1046 19 18 19H6C4.89543 19 4 18.1046 4 17V9Z" stroke="#ffffff" stroke-width="2" stroke-linejoin="round"/>
-          <path d="M12 7V4M12 4C12.5523 4 13 3.55228 13 3C13 2.44772 12.5523 2 12 2C11.4477 2 11 2.44772 11 3C11 3.55228 11.4477 4 12 4Z" fill="#a78bfa" stroke="#a78bfa" stroke-width="1.8"/>
-          <rect x="1.5" y="11" width="2.5" height="4.5" rx="1.2" fill="#a78bfa"/>
-          <rect x="20" y="11" width="2.5" height="4.5" rx="1.2" fill="#a78bfa"/>
-          <!-- Thunderbolt -->
-          <path d="M13 5.5L8 12.5H12L10.5 19L16.5 12H12.5L13 5.5Z" fill="#fbbf24" stroke="#d97706" stroke-width="1" stroke-linejoin="round"/>
+        <svg viewBox="0 0 32 32" width="30" height="30" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+          <!-- Compact C monogram, open toward the energy mark. -->
+          <path d="M24 7H12L6 13V23L10 27H23L26 21H14L12 19V15L15 12H21L24 7Z" fill="currentColor"/>
+          <path d="M25 3L19 15H24L21 24L30 12H25L29 3H25Z" fill="#fffbed"/>
         </svg>
       </span>
       <span class="__ot_icon_collapse">&#8722;</span>
@@ -1003,63 +1034,81 @@
   }
 
   /* ── Command Dispatch ── */
+  var pendingControl = '';
+  P.querySelectorAll('button').forEach(function(button) { button.type = 'button'; });
   function sendCmd(action, payload) {
     var el = document.getElementById('__omnitasker_commands');
     if (el) {
+      var queue = [];
+      try { queue = JSON.parse(el.dataset.queue || '[]'); } catch(ex) {}
+      if (!Array.isArray(queue)) queue = [];
+      queue.push({action: action, payload: payload || ''});
+      el.dataset.queue = JSON.stringify(queue);
       el.dataset.action = action || '';
       el.dataset.payload = payload || '';
+      return true;
     }
+    return false;
+  }
+
+  function updatePauseButton(s) {
+    if (!PAUSE) return;
+    var paused = s && s.phase === 'paused_hitl';
+    if (pendingControl === 'pause' && paused) pendingControl = '';
+    if (pendingControl === 'resume' && s && !paused && !s.pauseRequested) pendingControl = '';
+    var waiting = pendingControl || (s && s.pauseRequested && !paused ? 'pause' : '');
+    PAUSE.disabled = !!waiting || !!(s && s.stopRequested);
+    PAUSE.dataset.paused = paused ? 'true' : 'false';
+    PAUSE.className = '__ot_btn ' + (paused ? '--resume' : '--pause');
+    PAUSE.textContent = waiting === 'pause' ? 'Pausing…' : waiting === 'resume' ? 'Resuming…' : paused ? '🔓 Resume' : '⏸️ Pause';
+    PAUSE.title = waiting === 'pause' ? 'Pause requested; waiting for the current action to finish' : paused ? 'Resume agent' : 'Pause after the current action';
   }
 
   if (PAUSE) {
     PAUSE.addEventListener('click', function(e) {
       e.stopPropagation();
-      if (PAUSE.dataset.paused === 'true') {
-        sendCmd('resume');
-        PAUSE.innerHTML = '&#9199;&#65039; Pause';
-        PAUSE.className = '__ot_btn --pause';
-        PAUSE.dataset.paused = 'false';
-      } else {
-        sendCmd('pause');
-        PAUSE.innerHTML = '&#128275; Resume';
-        PAUSE.className = '__ot_btn --resume';
-        PAUSE.dataset.paused = 'true';
+      var action = PAUSE.dataset.paused === 'true' ? 'resume' : 'pause';
+      if (sendCmd(action)) {
+        pendingControl = action;
+        updatePauseButton(lastState);
       }
     });
   }
   if (STOP) {
-    STOP.addEventListener('click', function(e) { e.stopPropagation(); sendCmd('stop'); });
+    STOP.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (sendCmd('stop')) { STOP.disabled = true; STOP.textContent = 'Stopping…'; }
+    });
   }
   if (SEND) {
     SEND.addEventListener('click', function() {
       if (!S_INP) return;
       var v = S_INP.value.trim();
-      if (v) { sendCmd('suggestion', v); S_INP.value = ''; }
+      if (v && sendCmd('suggestion', v)) { S_INP.value = ''; }
     });
   }
   if (S_INP) {
     S_INP.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); if (SEND) SEND.click(); }
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (SEND) SEND.click(); }
     });
   }
   if (COPY) {
-    COPY.addEventListener('click', function() {
+    COPY.addEventListener('click', async function() {
       var code = (FAIL_P && FAIL_P.textContent) || '';
       try {
-        navigator.clipboard.writeText(code).then(function() {
-          COPY.textContent = '\u2713 Copied';
-          setTimeout(function() { if (COPY) COPY.textContent = 'Copy'; }, 2000);
-        });
+        await navigator.clipboard.writeText(code);
+        COPY.textContent = '\u2713 Copied';
       } catch(ex) {
-        /* Fallback: select text */
-        if (FAIL_P) {
-          var range = document.createRange();
-          range.selectNodeContents(FAIL_P);
-          var sel = window.getSelection();
-          sel.removeAllRanges();
-          sel.addRange(range);
-        }
+        var field = document.createElement('textarea');
+        field.value = code;
+        field.style.cssText = 'position:fixed;left:-9999px;top:0';
+        document.body.appendChild(field);
+        field.select();
+        try { COPY.textContent = document.execCommand('copy') ? '\u2713 Copied' : 'Copy failed'; }
+        catch(copyError) { COPY.textContent = 'Copy failed'; }
+        finally { field.remove(); }
       }
+      setTimeout(function() { if (COPY) COPY.textContent = 'Copy'; }, 2000);
     });
   }
 
@@ -1187,18 +1236,7 @@
     }
 
     /* Controls */
-    if (PAUSE) {
-      var isPaused = s.phase === 'paused_hitl';
-      if (isPaused) {
-        PAUSE.innerHTML = '&#128275; Resume';
-        PAUSE.className = '__ot_btn --resume';
-        PAUSE.dataset.paused = 'true';
-      } else {
-        PAUSE.innerHTML = '&#9199;&#65039; Pause';
-        PAUSE.className = '__ot_btn --pause';
-        PAUSE.dataset.paused = 'false';
-      }
-    }
+    updatePauseButton(s);
 
     /* Failed Code */
     if (FAIL && FAIL_P) {

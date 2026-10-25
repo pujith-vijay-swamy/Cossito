@@ -19,6 +19,12 @@ def is_submission_successful(record: SubmissionRecord) -> bool:
     """
     if not record.terminal:
         return False
+    if record.failed_count is not None and record.failed_count > 0:
+        return False
+    if record.total_count is not None and record.passed_count is not None and record.passed_count != record.total_count:
+        return False
+    if record.outcome in ('wrong_answer', 'runtime_error', 'compilation_error', 'time_limit_exceeded', 'rejected'):
+        return False
     if record.outcome == 'accepted':
         return True
     if record.total_count is None or record.total_count == 0:
@@ -95,7 +101,7 @@ def parse_test_results(raw_text: str) -> SubmissionRecord:
         re.search(r'\b(wrong\s+answer|time\s+limit\s+exceeded|runtime\s+error|compilation\s+error)\b', text_lower)
     )
 
-    if has_accepted_kw:
+    if has_accepted_kw and not has_failure_kw:
         record.outcome = "accepted"
     elif "wrong answer" in text_lower:
         record.outcome = "wrong_answer"
@@ -158,12 +164,12 @@ def parse_test_results(raw_text: str) -> SubmissionRecord:
 
     # Evaluate outcome from empirical counts if available
     if record.total_count is not None and record.total_count > 0:
-        if record.passed_count == record.total_count:
+        if record.passed_count == record.total_count and not has_failure_kw and not (record.failed_count or 0):
             record.outcome = "accepted"
             record.failed_count = 0
-        elif record.failed_count is not None and record.failed_count > 0 and not record.outcome:
+        elif record.failed_count is not None and record.failed_count > 0:
             record.outcome = "wrong_answer"
-    elif record.passed_count is not None and record.failed_count == 0 and record.passed_count > 0:
+    elif record.passed_count is not None and record.failed_count == 0 and record.passed_count > 0 and not has_failure_kw:
         record.outcome = "accepted"
         record.total_count = record.passed_count
 

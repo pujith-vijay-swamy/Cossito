@@ -110,6 +110,8 @@ from dom_extraction import (
     is_navigation_or_overview_text,
     clean_extracted_problem_text,
     has_problem_statement_markers,
+    wait_for_page_ready,
+    is_loading_placeholder,
     extract_problem_from_dom,
     inject_code_to_editor,
     extract_ref_images_to_disk,
@@ -275,9 +277,11 @@ class AgentOrchestrator:
         control_flags: Optional[dict] = None,
         base_url: Optional[str] = None,
     ) -> None:
-        self.url = url
-        self._workspace_url = url
+        from url_security import normalize_target_url
+        self.url = normalize_target_url(url)
+        self._workspace_url = self.url
         self._reference_urls: set[str] = set()
+        self._reference_image_cache: dict[tuple, list[dict]] = {}
         self._workspace_lock = asyncio.Lock()
         self.api_key = api_key
         self._on_state_change = on_state_change
@@ -493,17 +497,18 @@ class AgentOrchestrator:
             # Clean up extracted reference images
             self._cleanup_ref_images()
 
-            self._log("Cleaning up — closing browser...", "info")
-            try:
-                await self.browser_mgr.close()
-            except Exception:
-                pass
+            # Stop overlay reads before closing their shared browser connection.
             if poll_task is not None:
                 poll_task.cancel()
                 try:
                     await poll_task
                 except asyncio.CancelledError:
                     pass
+            self._log("Cleaning up — closing browser...", "info")
+            try:
+                await self.browser_mgr.close()
+            except Exception:
+                pass
 
         return self.state
 
@@ -605,10 +610,12 @@ class AgentOrchestrator:
         self._code_written_in_current_task = False
         self._user_skip_requested = False
         self._last_report = None
+        self._submission_started_task_id = None
         if hasattr(self, "state") and self.state is not None:
             self.state.model_thinking = None
         self._current_task = task
         self._reference_urls = set()
+        self._reference_image_cache = {}
         task_label = task.platform_task.title or f"Task #{task.queue_index + 1}"
         if task.description and is_navigation_or_overview_text(task.description):
             cleaned_init = clean_extracted_problem_text(task.description)
@@ -636,10 +643,19 @@ class AgentOrchestrator:
         browser = await self.browser_mgr.get_browser()
         page = await self._get_current_page_safe(browser)
         if page is not None:
+            await wait_for_page_ready(page)
             current_url = await page.get_url()
             if self._is_workspace_url(current_url):
                 self._workspace_url = current_url
                 task.platform_task.url = current_url
+
+            # Re-read after task selection even if the cached recon description
+            # was long enough: it may have been captured during hydration.
+            fresh_text, _, _ = await self._extract_problem_from_dom_direct(page)
+            fresh_text = clean_extracted_problem_text(fresh_text)
+            if fresh_text and not is_navigation_or_overview_text(fresh_text):
+                task.description = fresh_text
+                self._notify()
 
         # Re-extract problem description from DOM for tasks with placeholder descriptions
         is_placeholder = (
@@ -647,6 +663,7 @@ class AgentOrchestrator:
             or (task.description or "").strip().endswith("Coding challenge")
             or len((task.description or "").strip()) < 40
             or is_navigation_or_overview_text(task.description or "")
+            or is_loading_placeholder(task.description or "")
         )
         if is_placeholder:
             try:
@@ -676,6 +693,9 @@ class AgentOrchestrator:
             except Exception as e:
                 self._log(f"⚠️ Could not re-extract description for {task_label}: {e}", "warn")
 
+        if is_loading_placeholder(task.description or ""):
+            raise RuntimeError("The task statement is still loading; refusing to generate a solution from placeholder text.")
+
         self._reference_urls = {
             urljoin(self._workspace_url, value.rstrip('.,;)'))
             for value in re.findall(r'https?://[^\s<>"\']+', task.description or '')
@@ -695,9 +715,11 @@ class AgentOrchestrator:
             except Exception as exc:
                 self._log(f"Could not collect image reference locations: {exc}", "warn")
 
+        attempt_num = 0
         while task.budgets.has_code_repairs():
-            attempt_num = len(task.submissions) + 1
-            attempt_label = f"(attempt {attempt_num}/{task.budgets.code_repairs + len(task.submissions)})"
+            attempt_num += 1
+            self._execution_blocked_reason = None
+            attempt_label = f"(attempt {attempt_num}; {task.budgets.code_repairs} repairs available)"
             self._log(f"   ▸ {task_label}/{total_tasks} {attempt_label}")
 
             try:
@@ -705,6 +727,8 @@ class AgentOrchestrator:
             except Exception as exc:
                 task.error_log.append(f"Exception: {exc}")
                 self._log(f"   ✖ {task_label} exception: {exc}", "error")
+                if not self._code_written_in_current_task:
+                    self._execution_blocked_reason = str(exc) or type(exc).__name__
                 success = False
 
             if success:
@@ -732,6 +756,18 @@ class AgentOrchestrator:
                 self._log(f"   ⏭️ {task_label} — SKIPPED", "warn")
                 self._notify()
                 return
+
+            if self._execution_blocked_reason:
+                self._set_phase(AgentPhase.PAUSED_HITL)
+                self.state.hitl_reason = f"Execution stopped before writing code: {self._execution_blocked_reason}. Check the page or model connection, then Resume to re-read the task."
+                self._log(self.state.hitl_reason, "error")
+                self._notify()
+                await self.hitl.trigger_pause(self.state.hitl_reason)
+                if self.control_flags.get('stop_requested') or self._stop_requested:
+                    return
+                self.state.hitl_reason = None
+                self._set_phase(AgentPhase.EXECUTING)
+                continue
 
             if task.budgets.has_code_repairs():
                 try:
@@ -809,10 +845,10 @@ class AgentOrchestrator:
         if page is None:
             return await async_fn()
         try:
-            await page.evaluate("""() => {
+            await asyncio.wait_for(page.evaluate("""() => {
                 const p = document.getElementById('__omnitasker_panel');
                 if (p) p.style.setProperty('display', 'none', 'important');
-            }""")
+            }"""), timeout=2.0)
         except Exception:
             pass
 
@@ -820,7 +856,7 @@ class AgentOrchestrator:
             return await async_fn()
         finally:
             try:
-                await page.evaluate("""() => {
+                await asyncio.wait_for(page.evaluate("""() => {
                     const p = document.getElementById('__omnitasker_panel');
                     if (p) {
                         p.style.removeProperty('display');
@@ -828,7 +864,7 @@ class AgentOrchestrator:
                             p.style.setProperty('display', 'flex', 'important');
                         }
                     }
-                }""")
+                }"""), timeout=2.0)
             except Exception:
                 pass
 
@@ -844,18 +880,35 @@ class AgentOrchestrator:
             except Exception as e:
                 print(f"Error cleaning ref_images: {e}")
 
-    async def _extract_ref_images_to_disk(self) -> list[dict]:
-        """Extract all reference/mockup images from the current page and save them to disk."""
-        browser = await self.browser_mgr.get_browser()
-        page = await self._get_current_page_safe(browser)
-        if page is None:
-            self._log("⚠️ No active page available for reference image extraction.", "warn")
-            return []
+    async def _extract_ref_images_to_disk(self, timeout_seconds: float = 30.0) -> list[dict]:
+        """Bound optional image inspection and reuse its result within a task."""
+        task = self._current_task
+        key = (task.task_id, task.description) if task is not None else None
+        cache = self._reference_image_cache
+        if key is not None and key in cache:
+            return cache[key]
 
-        async def _do_extract():
-            return await extract_ref_images_to_disk(browser, page, log_fn=self._log)
+        async def collect():
+            browser = await self.browser_mgr.get_browser()
+            page = await self._get_current_page_safe(browser)
+            if page is None:
+                self._log("No page available for optional image inspection; continuing from text.", "warn")
+                return []
+            # Scanning needs no screenshot. Only hide the overlay when a real
+            # candidate is captured, so empty results have no cleanup CDP wait.
+            return await extract_ref_images_to_disk(
+                browser, page, log_fn=self._log,
+                capture_context=self._with_overlay_hidden,
+            )
 
-        return await self._with_overlay_hidden(page, _do_extract)
+        try:
+            result = await asyncio.wait_for(collect(), timeout=timeout_seconds)
+        except Exception as exc:
+            self._log(f"Optional reference inspection unavailable ({type(exc).__name__}); continuing from written requirements.", "warn")
+            result = []
+        if key is not None:
+            cache[key] = result
+        return result
 
     async def _solve_and_verify(self, task: CodingTask, total_tasks: int = 1) -> bool:
         """Run an isolated sub-agent (TaskSubagent) to solve a single task and verify output."""
@@ -888,6 +941,13 @@ class AgentOrchestrator:
                 task.solution_code = result.solution_code
             return True
 
+        self._log(f"Execution did not complete: {result.output_message}", "error")
+        if not self._code_written_in_current_task:
+            self._execution_blocked_reason = result.output_message
+        elif any(marker in result.output_message.lower() for marker in ('json_invalid', 'invalid or incomplete json', 'invalid json')):
+            self._execution_blocked_reason = result.output_message
+        elif task.submissions and not task.submissions[-1].terminal:
+            self._execution_blocked_reason = 'The current submission still has no verified final verdict. Preserve it and inspect the result before retrying.'
         return False
 
     # ------------------------------------------------------------------
@@ -985,6 +1045,16 @@ class AgentOrchestrator:
                     page = None
 
         if page is not None and self.state.phase == AgentPhase.EXECUTING:
+            # Resume can leave browser-use focused on a blank/new tab. Reuse the
+            # already-open workspace before considering navigation recovery.
+            if not self.hitl.is_paused and not self._is_workspace_url(await page.get_url()):
+                for candidate in await browser.get_pages():
+                    if self._is_workspace_url(await candidate.get_url()):
+                        page = candidate
+                        target_id = getattr(candidate, 'target_id', None) or getattr(candidate, '_target_id', None)
+                        if target_id and hasattr(browser, 'get_or_create_cdp_session'):
+                            await browser.get_or_create_cdp_session(target_id, focus=True)
+                        break
             await self._restore_workspace_if_needed(page)
         return page
 
@@ -1118,13 +1188,8 @@ class AgentOrchestrator:
                     await cdp.send_raw("Debugger.enable", {}, session_id=sid)
                     await cdp.send_raw("Debugger.setSkipAllPauses", {"skip": True}, session_id=sid)
                     await cdp.send_raw("Debugger.setBreakpointsActive", {"active": False}, session_id=sid)
-                    await cdp.send_raw("Page.addScriptToEvaluateOnNewDocument", {
-                        "source": """
-                            try {
-                                window.Function.prototype.constructor = function() { return function() {}; };
-                            } catch(e) {}
-                        """
-                    }, session_id=sid)
+                    # CDP can suppress debugger pauses without changing the
+                    # website's JavaScript constructors or installing scripts.
         except Exception:
             pass
 
@@ -1190,6 +1255,11 @@ class AgentOrchestrator:
                 data = action.model_dump(exclude_none=True) if hasattr(action, 'model_dump') else action
                 if isinstance(data, dict):
                     navigation = data.get('navigate') or data.get('go_to_url')
+                    if (self.state.phase == AgentPhase.EXECUTING and isinstance(navigation, dict)
+                            and navigation.get('url') == getattr(browser_state, 'url', None)):
+                        model_output.action = []
+                        self._log("Task page is already open; skipped redundant navigation.", "info")
+                        break
                     if isinstance(navigation, dict) and not self._is_workspace_url(navigation.get('url', '')):
                         model_output.action = []
                         self._log("Ignored reference URL navigation; continue coding in the task workspace.", "warn")

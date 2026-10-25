@@ -20,6 +20,7 @@ import html
 import os
 import queue
 import threading
+from pathlib import Path
 from copy import deepcopy
 from typing import Optional
 
@@ -39,7 +40,7 @@ from models import AgentPhase, AgentState, TaskStatus
 
 st.set_page_config(
     page_title="Cossito",
-    page_icon="⚡",
+    page_icon=str(Path(__file__).resolve().parent / "assets" / "cossito-mark.png"),
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -560,7 +561,85 @@ div[data-baseweb="popover"] [role="listbox"] { background: #202027; color: #fffb
     .agent-header p { font-size: .85rem; }.agent-header::before { right: -260px; }
     .task-card, .cog-card { padding: 1.1rem; }.terminal-title { letter-spacing: 0; }
 }
+/* Electric control desk. Header and workspace branding stay unchanged. */
+[data-testid="stSidebar"] {
+    background: radial-gradient(circle, #20142e12 1px, transparent 1px) 0 0 / 10px 10px,
+                linear-gradient(145deg, #dfd0ff, #c1a5f4 48%, #efcfdf);
+    background-size: 10px 10px, 180% 180%;
+    animation: cossito-panel-grade 18s ease-in-out infinite alternate;
+    border-right: 3px solid #08060d; box-shadow: 7px 0 0 #c1a0ff16;
+    color: #271a39; color-scheme: dark;
+}
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { color: #36234c; }
+[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] h3 {
+    color: #21132f; font-size: 1.24rem; font-weight: 700; letter-spacing: -.055em;
+    padding: 8px 0 12px; border-bottom: 2px solid #392247; margin-bottom: 16px;
+}
+[data-testid="stSidebar"] [data-testid="stWidgetLabel"] p { font-weight: 700; font-size: .78rem; letter-spacing: .015em; }
+[data-testid="stSidebar"] hr { border-color: #57396950 !important; margin: 1.6rem 0 !important; }
+[data-testid="stSidebar"] code { background: #2b1f3a; color: #e9ff69; border: 1px solid #574366; border-radius: 4px; }
+[data-testid="stSidebar"] a { color: #4b237b; text-decoration-color: #4b237b80; }
+[data-testid="stSidebar"] div[data-baseweb="input"],
+[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+[data-testid="stSidebar"] div[data-baseweb="textarea"] {
+    background: #241b31 !important; border: 2px solid #160e20 !important;
+    border-radius: 9px !important; box-shadow: 3px 4px 0 #8668ab !important;
+    transition: box-shadow .2s ease, border-color .2s ease !important;
+}
+[data-testid="stSidebar"] div[data-baseweb="input"]:focus-within,
+[data-testid="stSidebar"] div[data-baseweb="select"] > div:focus-within,
+[data-testid="stSidebar"] div[data-baseweb="textarea"]:focus-within {
+    border-color: #e9ff69 !important; box-shadow: 3px 4px 0 #281b39, 0 0 0 3px #e9ff6940 !important;
+}
+[data-testid="stSidebar"] input::placeholder,
+[data-testid="stSidebar"] textarea::placeholder { color: #b8a6ce !important; opacity: 1; }
+[data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] button { color: #271a39; }
+[data-testid="stSidebar"] [data-testid="stTooltipIcon"] { color: #4d3264; }
+.stButton > button {
+    position: relative !important; isolation: isolate; overflow: hidden !important;
+    background: #c1a0ff !important; color: #241535 !important;
+    border: 2px solid #100b17 !important; border-radius: 9px !important;
+    min-height: 46px; padding: 10px 18px !important; font-weight: 700 !important;
+    box-shadow: 4px 5px 0 #050507 !important;
+    transition: transform .2s cubic-bezier(.2,.9,.3,1.3), box-shadow .2s ease, background .2s ease !important;
+}
+.stButton > button > * { position: relative; z-index: 1; }
+.stButton > button::before {
+    content: ''; pointer-events: none; position: absolute; z-index: 0; inset: 0 auto 0 0; width: 5px;
+    background: repeating-linear-gradient(135deg, #241535 0 3px, transparent 3px 6px); opacity: .55;
+}
+.stButton > button::after {
+    content: ''; pointer-events: none; position: absolute; z-index: 0; top: -80%; left: -60%; width: 35%; height: 260%;
+    background: linear-gradient(90deg, transparent, #ffffff65, transparent);
+    transform: translateX(-150%) rotate(24deg);
+}
+.stButton > button:hover {
+    background: #d9c4ff !important; color: #241535 !important;
+    transform: translate(-2px,-3px) rotate(-.8deg) !important;
+    box-shadow: 6px 8px 0 #050507 !important; border-color: #100b17 !important;
+}
+.stButton > button:hover::after { animation: cossito-button-sweep .8s ease-out; }
+.stButton > button:active { transform: translate(3px,4px) rotate(0) !important; box-shadow: 1px 1px 0 #050507 !important; }
+.stButton > button[kind="primary"] {
+    background: linear-gradient(110deg, #e9ff69 0%, #c4f55d 55%, #a5ed9e 100%) !important;
+    color: #1d2b0d !important; border-color: #1d2b0d !important;
+    box-shadow: 4px 5px 0 #050507, 0 0 20px #e9ff6910 !important;
+}
+.stButton > button[kind="primary"]::after { animation: cossito-button-sweep 6s ease-in-out infinite; }
+.stButton > button[kind="primary"]:hover { background: linear-gradient(110deg, #f1ff9c, #b2f79a) !important; color: #1d2b0d !important; box-shadow: 6px 8px 0 #050507, 0 0 25px #e9ff6920 !important; }
+[data-testid="stSidebar"] .stButton > button { box-shadow: 4px 5px 0 #2b173f !important; }
+[data-testid="stSidebar"] .stButton > button:hover { box-shadow: 6px 8px 0 #2b173f !important; }
+[data-testid="stSidebar"] .stButton > button:active { box-shadow: 1px 1px 0 #2b173f !important; }
+.stButton > button:focus-visible { outline: 3px solid #fffbed !important; outline-offset: 4px !important; }
+[data-testid="stSidebar"] .stButton > button:focus-visible { outline-color: #532a7d !important; }
+.stButton > button:disabled, [data-testid="stSidebar"] .stButton > button:disabled { background: #a89bb8 !important; color: #40344f !important; border-color: #756685 !important; opacity: .65 !important; transform: none !important; box-shadow: none !important; cursor: not-allowed !important; }
+.stButton > button:disabled::before, .stButton > button:disabled::after { display: none !important; }
+@keyframes cossito-panel-grade { from { background-position: 0 0, 0% 0%; } to { background-position: 0 0, 100% 100%; } }
+@keyframes cossito-button-sweep { 0%,65% { transform: translateX(-150%) rotate(24deg); } 100% { transform: translateX(650%) rotate(24deg); } }
 @media (prefers-reduced-motion: reduce) {
+    [data-testid="stSidebar"] { animation: none !important; }
     .stApp *, .stApp *::before, .stApp *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
@@ -714,8 +793,13 @@ def render_sidebar_controls(api_key, target_url, model_name, provider, custom_ba
 
     # Clean URL and resolve API key from user input
     target_url_clean = target_url.strip() if target_url else ""
-    if target_url_clean and not (target_url_clean.startswith("http://") or target_url_clean.startswith("https://") or target_url_clean.startswith("file://")):
-        target_url_clean = "https://" + target_url_clean
+    if target_url_clean:
+        from url_security import normalize_target_url
+        try:
+            target_url_clean = normalize_target_url(target_url_clean)
+        except ValueError as exc:
+            st.error(str(exc))
+            target_url_clean = ""
 
     effective_api_key = (api_key or "").strip()
     if not effective_api_key and ("Local" in provider or "Ollama" in provider):

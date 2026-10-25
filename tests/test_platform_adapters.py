@@ -49,5 +49,43 @@ class TestPlatformAdapters(unittest.TestCase):
             loop.close()
 
 
+class TestSubmissionPolling(unittest.IsolatedAsyncioTestCase):
+    async def test_unrecognized_output_is_not_a_failed_terminal_verdict(self):
+        page = MagicMock()
+        page.evaluate = AsyncMock(return_value='Waiting for results')
+        result = await GenericAdapter().parse_result(page)
+        self.assertFalse(result.terminal)
+
+    async def test_completed_result_returns_without_extra_terminal_read(self):
+        adapter = MagicMock()
+        adapter.parse_result = AsyncMock(return_value=SubmissionRecord(terminal=True, outcome='accepted'))
+        adapter.is_terminal = AsyncMock()
+        result = await wait_for_terminal(MagicMock(), adapter, timeout=.1, poll_interval=.01)
+        self.assertTrue(result.terminal)
+        adapter.parse_result.assert_awaited_once()
+        adapter.is_terminal.assert_not_awaited()
+
+    async def test_hung_browser_read_is_bounded_and_not_retried_after_timeout(self):
+        adapter = MagicMock()
+        async def stalled(page):
+            await asyncio.Event().wait()
+        adapter.parse_result = AsyncMock(side_effect=stalled)
+        result = await asyncio.wait_for(wait_for_terminal(MagicMock(), adapter, timeout=.05), timeout=.5)
+        self.assertFalse(result.terminal)
+        adapter.parse_result.assert_awaited_once()
+
+    async def test_partial_results_while_busy_are_not_terminal(self):
+        adapter = MagicMock()
+        adapter.parse_result = AsyncMock(return_value=SubmissionRecord(terminal=False, passed_count=2, total_count=5))
+        result = await wait_for_terminal(MagicMock(), adapter, timeout=.04, poll_interval=.01)
+        self.assertFalse(result.terminal)
+
+    async def test_user_cancellation_propagates(self):
+        adapter = MagicMock()
+        adapter.parse_result = AsyncMock(side_effect=asyncio.CancelledError())
+        with self.assertRaises(asyncio.CancelledError):
+            await wait_for_terminal(MagicMock(), adapter, timeout=.1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -322,6 +322,8 @@ class OverlayManager:
                 "logs": logs_data,
                 "hitlReason": self._orch.state.hitl_reason,
                 "failedCode": self._orch.state.failed_injection_code,
+                "pauseRequested": bool(self._orch.control_flags.get("pause_requested")),
+                "stopRequested": bool(self._orch.control_flags.get("stop_requested")),
                 "tasks": tasks_data,
             }
 
@@ -358,19 +360,21 @@ class OverlayManager:
                 "() => {"
                 "    var el = document.getElementById('__omnitasker_commands');"
                 "    if (!el) return null;"
+                "    var queue = JSON.parse(el.dataset.queue || '[]');"
+                "    el.dataset.queue = '[]';"
                 "    var action = el.dataset.action || '';"
                 "    var payload = el.dataset.payload || '';"
-                "    if (!action) return null;"
+                "    if (!action && !queue.length) return null;"
                 "    el.dataset.action = '';"
                 "    el.dataset.payload = '';"
-                "    return { action: action, payload: payload };"
+                "    return queue.length ? queue : [{ action: action, payload: payload }];"
                 "}"
             )
 
             if not cmd_str:
                 return
 
-            if isinstance(cmd_str, dict):
+            if isinstance(cmd_str, (dict, list)):
                 cmd = cmd_str
             else:
                 import json
@@ -379,32 +383,43 @@ class OverlayManager:
                 except Exception:
                     return
 
-            if not cmd or not isinstance(cmd, dict):
-                return
+            commands = cmd if isinstance(cmd, list) else [cmd]
+            for cmd in commands:
+                if not isinstance(cmd, dict):
+                    continue
+                action = cmd.get("action", "")
+                payload = cmd.get("payload", "")
+                if self._orch.control_flags.get("stop_requested"):
+                    break
 
-            action = cmd.get("action", "")
-            payload = cmd.get("payload", "")
+                if action == "pause":
+                    import time
+                    self._orch.control_flags["pause_requested"] = True
+                    self._orch.control_flags["pause_click_time"] = time.time()
+                    self._orch._log("\u23F8\uFE0F Pause requested from browser overlay.", "warn")
 
-            if action == "pause":
-                import time
-                self._orch.control_flags["pause_requested"] = True
-                self._orch.control_flags["pause_click_time"] = time.time()
-                self._orch._log("\u23F8\uFE0F Pause requested from browser overlay.", "warn")
+                elif action == "resume":
+                    self._orch.control_flags["pause_requested"] = False
+                    self._orch.control_flags["pause_click_time"] = None
+                    self._orch.control_flags["pause_elapsed_time"] = None
+                    self._orch.hitl.resume()
+                    self._orch._log("\u25B6\uFE0F Resume triggered from browser overlay.", "success")
 
-            elif action == "resume":
-                self._orch.hitl.resume()
-                self._orch._log("\u25B6\uFE0F Resume triggered from browser overlay.", "success")
+                elif action == "stop":
+                    self._orch.control_flags["stop_requested"] = True
+                    self._orch._stop_requested = True
+                    self._orch.control_flags["pause_requested"] = False
+                    self._orch.hitl.resume()  # Also release pauses outside an agent task.
+                    active = getattr(self._orch, "_current_agent_task", None)
+                    if active is not None and not active.done():
+                        active.cancel()
+                    self._orch._log("\U0001f6d1 Stop requested from browser overlay.", "warn")
 
-            elif action == "stop":
-                self._orch.control_flags["stop_requested"] = True
-                self._orch._stop_requested = True
-                self._orch._log("\U0001f6d1 Stop requested from browser overlay.", "warn")
-
-            elif action == "suggestion" and payload:
-                if "suggestions" not in self._orch.control_flags:
-                    self._orch.control_flags["suggestions"] = []
-                self._orch.control_flags["suggestions"].append(payload)
-                self._orch._log(f"\U0001f4ac Suggestion from overlay: {payload}", "success")
+                elif action == "suggestion" and payload:
+                    if "suggestions" not in self._orch.control_flags:
+                        self._orch.control_flags["suggestions"] = []
+                    self._orch.control_flags["suggestions"].append(payload)
+                    self._orch._log(f"\U0001f4ac Suggestion from overlay: {payload}", "success")
 
         except Exception:
             pass  # Never crash the agent for overlay polling

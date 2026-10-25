@@ -12,6 +12,8 @@ flat Pydantic model (no separate BrowserConfig).
 from __future__ import annotations
 
 import os
+import asyncio
+from urllib.parse import urlsplit
 from pathlib import Path
 from typing import Optional
 
@@ -22,24 +24,6 @@ from browser_use import Browser
 _DEFAULT_PROFILE_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "browser_profile"
 )
-
-
-def _cleanup_profile_locks(user_data_dir: str) -> None:
-    """Remove stale Chrome lockfiles that prevent CDP debugging server attachment."""
-    p = Path(user_data_dir)
-    lock_files = ["lockfile", "SingletonLock", "SingletonCookie", "SingletonSocket", "DevToolsActivePort"]
-    for lf in lock_files:
-        try:
-            target = p / lf
-            if target.exists():
-                if target.is_dir():
-                    import shutil
-                    shutil.rmtree(target, ignore_errors=True)
-                else:
-                    target.unlink(missing_ok=True)
-                print(f"[BrowserManager] Cleaned stale profile lock: {lf}")
-        except Exception:
-            pass
 
 
 class BrowserManager:
@@ -61,6 +45,7 @@ class BrowserManager:
         print(f"[BrowserManager] Initialized with headless={self._headless}")
         self._user_data_dir = user_data_dir or _DEFAULT_PROFILE_DIR
         self._browser: Optional[Browser] = None
+        self._lifecycle_lock = asyncio.Lock()
 
         # Ensure the profile directory exists.
         Path(self._user_data_dir).mkdir(parents=True, exist_ok=True)
@@ -90,6 +75,10 @@ class BrowserManager:
 
     async def get_browser(self) -> Browser:
         """Return the shared Browser instance, creating it if necessary."""
+        async with self._lifecycle_lock:
+            return await self._get_browser_locked()
+
+    async def _get_browser_locked(self) -> Browser:
         # Auto-close any previously active browser from an earlier agent run
         # to release the Playwright profile lock.
         if BrowserManager._active_instance and BrowserManager._active_instance != self:
@@ -103,33 +92,45 @@ class BrowserManager:
                     BrowserManager._active_instance._browser = None
         BrowserManager._active_instance = self
 
-        # Delete stale lockfiles if they exist to prevent profile lock warnings
-        _cleanup_profile_locks(self._user_data_dir)
-
-        if self._browser is not None:
-            # Check if the existing browser's WebSocket is still alive.
-            # IMPORTANT: Only treat as stale if the browser was previously started
-            # (has a _cdp_client_root) but the WebSocket connection died.
-            # A browser that was never started (no _cdp_client_root) is NOT stale —
-            # it just hasn't been initialized by Agent.run() yet.
-            try:
-                has_been_started = getattr(self._browser, '_cdp_client_root', None) is not None
-                if has_been_started and not self._browser.is_cdp_connected:
-                    print("[BrowserManager] Stale browser detected (WebSocket closed). Recreating...")
-                    try:
-                        import asyncio as _aio
-                        await _aio.wait_for(self._browser.close(), timeout=3.0)
-                    except Exception:
-                        pass
-                    self._browser = None
-            except Exception:
-                # If we can't even check, assume it's dead
-                print("[BrowserManager] Cannot verify browser state. Recreating...")
-                self._browser = None
+        # Chrome owns profile locks. Never delete them while a session may be alive.
 
         if self._browser is None:
             self._browser = self._build_browser()
         return self._browser
+
+    async def open_target_page(self, url: str):
+        """Open the initial target once; fail before recon if startup/navigation fails."""
+        async def open_page():
+            browser = await self.get_browser()
+            if not getattr(browser, "is_cdp_connected", False):
+                await browser.start()
+            page = await browser.get_current_page()
+            if page is None:
+                await browser.navigate_to(url)
+                page = await browser.get_current_page()
+            else:
+                current = await page.get_url()
+                def identity(value):
+                    parts = urlsplit(value)
+                    return (parts.scheme.lower(), parts.hostname, parts.port or
+                            (443 if parts.scheme == "https" else 80),
+                            parts.path or "/", parts.query, parts.fragment)
+                if identity(current) != identity(url):
+                    await page.goto(url)
+                    # CDP Page.navigate returns before the new document commits.
+                    # Wait for the URL to change instead of inspecting about:blank.
+                    while await page.get_url() == current:
+                        await asyncio.sleep(0.1)
+            if page is None:
+                raise RuntimeError("Navigation failed: no active target page")
+            actual = await page.get_url()
+            if not actual or actual.startswith(("about:", "chrome:", "chrome-error:", "edge:")):
+                raise RuntimeError("Navigation failed: target page did not open")
+            return page
+        try:
+            return await asyncio.wait_for(open_page(), timeout=45.0)
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError("Navigation failed: browser startup or target page timed out") from exc
 
     async def close(self) -> None:
         """Gracefully close the browser if it's open."""

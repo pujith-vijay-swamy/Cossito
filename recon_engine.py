@@ -29,6 +29,7 @@ from dom_extraction import (
     extract_problem_title_from_text,
     has_problem_statement_markers,
     parse_eval_result,
+    wait_for_page_ready,
 )
 
 
@@ -154,6 +155,7 @@ class ReconEngine:
             page = await self._orch._get_current_page_safe(browser)
             if page is None:
                 return None
+            await wait_for_page_ready(page)
             extracted_text, section_questions, _ = await self._orch._extract_problem_from_dom_direct(page)
             extracted_text = clean_extracted_problem_text(extracted_text)
             if not extracted_text or len(extracted_text) < 30:
@@ -182,18 +184,8 @@ class ReconEngine:
                 t.expected_behavior = "100% test cases pass (0 failed)"
                 return TaskQueue(tasks=[t], source_url=current_url, recon_summary="Defensive DOM recovery: Problem statement recovered directly from page DOM")
             else:
-                title = "Question 1"
-                try:
-                    raw_title = await page.evaluate("() => document.title || ''")
-                    if raw_title:
-                        title = str(raw_title).split('-')[0].split('|')[0].strip() or "Question 1"
-                except Exception:
-                    pass
-                desc = extracted_text or f"Solve the coding problem for {title}."
-                t = CodingTask(queue_index=0, platform_task=PlatformTask(key="1", title=title))
-                t.description = desc
-                t.expected_behavior = "100% test cases pass (0 failed)"
-                return TaskQueue(tasks=[t], source_url=current_url, recon_summary="Defensive DOM recovery: Recovered from page context")
+                # A page title or splash screen is not evidence of a coding task.
+                return None
         except Exception as e:
             self._orch._log(f"Defensive DOM recovery note: {e}", "warn")
         return None
@@ -204,73 +196,28 @@ class ReconEngine:
         """Navigate to the URL and produce a TaskQueue."""
         self._orch._log(f"🔍 Recon: navigating to {self._orch.url}")
 
-        # Phase 2 Security Gate: Enforce 2-Layer URL check BEFORE sending any packets to target URL
-        await self._orch._hitl_gate(self._orch.url)
-
+        # Validate before navigation, but show login pages before waiting for a human.
+        denied = self._orch.security_gate.check_bad_urls_denylist(self._orch.url)
+        if denied is not None:
+            raise RuntimeError(f"Target URL blocked: {denied.reason}")
+        page = await self._orch.browser_mgr.open_target_page(self._orch.url)
         browser = await self._orch.browser_mgr.get_browser()
-        if not getattr(browser, "is_cdp_connected", False):
-            try:
-                await browser.start()
-            except Exception as e:
-                self._orch._log(f"Browser startup note: {e}", "warn")
-
-        current_url = self._orch.url
-        page = None
-        if getattr(browser, "is_cdp_connected", False):
-            try:
-                page = await self._orch._get_current_page_safe(browser)
-                p_url = None
-                if page is not None:
-                    try:
-                        p_url = await page.get_url()
-                    except Exception:
-                        p_url = None
-                target_url = self._orch.url or ""
-                target_base = target_url.split('?')[0] if target_url else ""
-                has_target_params = "?" in target_url
-                p_url_base = p_url.split('?')[0] if p_url else ""
-
-                needs_nav = (
-                    not p_url
-                    or p_url in ("about:blank", "chrome://newtab/")
-                    or (target_base and not p_url.startswith(target_base))
-                    or (has_target_params and ("?" not in p_url or p_url != target_url))
-                )
-                if needs_nav:
-                    self._orch._log(f"🔗 Navigating to target URL: {self._orch.url}", "info")
-                    nav_done = False
-                    if hasattr(browser, "navigate_to") and callable(getattr(browser, "navigate_to", None)):
-                        try:
-                            nav_res = browser.navigate_to(self._orch.url)
-                            if asyncio.iscoroutine(nav_res) or hasattr(nav_res, "__await__"):
-                                await nav_res
-                            nav_done = True
-                        except Exception:
-                            nav_done = False
-                    if not nav_done and page is not None and hasattr(page, "goto"):
-                        await page.goto(self._orch.url)
-                    await asyncio.sleep(3)  # Wait for page hydration
-
-                # Re-acquire page after navigation
-                page = await self._orch._get_current_page_safe(browser)
-                if page is not None:
-                    await self._orch._disable_cdp_debugger_pauses(browser, page)
-                    await self._orch._inject_overlay(page)
-                    await self._orch._sync_overlay_state(page)
-                    current_url = await page.get_url()
-            except Exception as e:
-                self._orch._log(f"Pre-navigation warning: {e}", "warn")
-                current_url = self._orch.url
-                try:
-                    if getattr(browser, "is_cdp_connected", False):
-                        page = await self._orch._get_current_page_safe(browser)
-                except Exception:
-                    page = None
+        current_url = await page.get_url()
+        await self._orch._disable_cdp_debugger_pauses(browser, page)
+        await self._orch._inject_overlay(page)
+        await self._orch._sync_overlay_state(page)
 
         self._orch._log(f"🔍 Target URL: {current_url}")
         await self._orch._hitl_gate(current_url)
+        # Login can replace the active tab. Do not inspect the old login document.
+        page = await self._orch._get_current_page_safe(browser)
+        if page is None:
+            raise RuntimeError("Navigation failed: target page unavailable after login")
+        current_url = await page.get_url()
 
         # ⚡ Direct Fast-Track Reconnaissance Engine (Instant 1.5s vs 60-90s)
+        self._orch._log("Waiting for the main page content before reading tasks...", "info")
+        await wait_for_page_ready(page)
         if page is not None:
             try:
                 # Progressive hydration poll: single-page applications take 2-4s to load markdown/tabs
@@ -426,6 +373,7 @@ class ReconEngine:
                     if click_res:
                         self._orch._log(f"🧭 {click_res}. Waiting for problem statement to hydrate...", "info")
                         await asyncio.sleep(1.5)
+                        await wait_for_page_ready(page)
                         try:
                             current_url = await page.get_url()
                         except Exception:
@@ -515,6 +463,8 @@ class ReconEngine:
         use_vision = getattr(self._orch, "use_vision", True)
         agent = _get_sym("Agent", Agent)(
             task=get_recon_task_prompt(self._orch.url, use_vision),
+            initial_actions=[],
+            directly_open_url=False,
             llm=llm,
             browser=browser,
             controller=controller,
@@ -733,6 +683,17 @@ class ReconEngine:
                 ];
                 const allLinks = Array.from(document.querySelectorAll(candidateSelectors.join(',')));
 
+                function selectQuestion(el) {
+                    const target = el.matches('a, button, [role="tab"]') ? el : (el.querySelector('a, button') || el);
+                    if ([el, target].some(node => node.getAttribute('aria-selected') === 'true' ||
+                        (node.hasAttribute('aria-current') && node.getAttribute('aria-current') !== 'false') ||
+                        node.getAttribute('data-active') === 'true')) return 'Already selected';
+                    expandParents(target);
+                    // One native click preserves SPA routing and avoids double navigation.
+                    target.click();
+                    return 'Clicked';
+                }
+
                 // 1. Support matching by task.platform_task.title (e.g. Mantine NavLinks on coding platforms)
                 if (taskTitle && taskTitle.length > 1) {
                     for (const el of allLinks) {
@@ -746,21 +707,8 @@ class ReconEngine:
                         const txt = (labelEl.innerText || el.innerText || '').toLowerCase().trim().replace(/\s+/g, ' ');
                         const minLen = Math.min(6, Math.floor(taskTitle.length * 0.5));
                         if (txt && (txt === taskTitle || (txt.length >= minLen && (taskTitle.includes(txt) || txt.includes(taskTitle))))) {
-                            expandParents(el);
-                            try {
-                                el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                                el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                                el.click();
-                            } catch(e) {
-                                el.click();
-                            }
-                            if (el.tagName.toLowerCase() !== 'a') {
-                                const innerA = el.querySelector('a');
-                                if (innerA) {
-                                    try { innerA.click(); } catch(e) {}
-                                }
-                            }
-                            return "Clicked question tab matching title '" + (labelEl.innerText || el.innerText || '').trim() + "'";
+                            const selection = selectQuestion(el);
+                            return selection + " question tab matching title '" + (labelEl.innerText || el.innerText || '').trim() + "'";
                         }
                     }
                 }
@@ -781,21 +729,8 @@ class ReconEngine:
                     const labelEl = el.querySelector('.mantine-NavLink-label, [class*="label"]') || el;
                     const txt = (labelEl.innerText || el.innerText || '').trim();
                     if (txt && keyPatterns.some(p => p.test(txt)) && txt.length < 60) {
-                        expandParents(el);
-                        try {
-                            el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                            el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-                            el.click();
-                        } catch(e) {
-                            el.click();
-                        }
-                        if (el.tagName.toLowerCase() !== 'a') {
-                            const innerA = el.querySelector('a');
-                            if (innerA) {
-                                try { innerA.click(); } catch(e) {}
-                            }
-                        }
-                        return "Clicked question tab matching '" + txt + "'";
+                        const selection = selectQuestion(el);
+                        return selection + " question tab matching '" + txt + "'";
                     }
                 }
 
@@ -818,7 +753,8 @@ class ReconEngine:
 
             if nav_result:
                 self._orch._log(f"🧭 Auto-navigated browser to {task.platform_task.title or f'Task #{task.queue_index + 1}'}: {nav_result}", "info")
-                await asyncio.sleep(3)  # Wait for SPA problem statement and editor to update
+                if not str(nav_result).startswith("Already selected"):
+                    await asyncio.sleep(0.5)  # Yield for the SPA to apply the selection
         except Exception as e:
             print(f"Auto-navigation helper note: {e}")
 

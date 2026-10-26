@@ -214,9 +214,9 @@ _EXECUTION_SYSTEM_TEMPLATE = """\
 You are a senior software engineer solving a specific coding problem on a web page.
 
 🚨 CRITICAL OPERATIONAL MANDATES:
-- ⚡ LIGHTNING FAST-PATH SOLVER MANDATE (CRITICAL FOR MAXIMUM SPEED): Use the `submit_code_solution(code=...)` action as your primary solving tool! Calling `submit_code_solution` automatically clears the editor, injects your solution code, clicks 'Submit', and verifies test case metrics in 1 single step!
+- ⚡ LIGHTNING FAST-PATH SOLVER MANDATE (CRITICAL FOR MAXIMUM SPEED): Use the `submit_code_solution(code=...)` action as your primary solving tool! Calling `submit_code_solution` preserves matching editor content, discovers the page's validation workflow, and verifies completion evidence.
 - 🚫 NO MANUAL TEST LOOPS OR CUSTOM PRINT STATEMENTS: NEVER write custom main methods, manual test case loops, or extra print statements to test sample cases one-by-one. The platform automatically runs all sample and hidden test cases when you submit! Write clean, direct production code.
-- 🚫 DO NOT WASTE STEPS CLICKING 'RUN CODE': Do NOT waste steps clicking 'Run Code', waiting for output, reading output, and then clicking 'Submit'. Calling `submit_code_solution` directly tests all test cases instantly in 1 click!
+- Use the page's actual validation workflow: Run Tests, Check, Submit, or automatic validation. A separate Submit button is not required. Never click Next as evidence of correctness.
 
 Approved actions: extract_problem_description, read_code_from_editor, write_code_to_editor, submit_code_solution, verify_submission_status, inspect_accessibility_tree, inspect_console_logs, inspect_network_activity, report_task_result, describe_page_visuals, skip_current_task, pause_for_human, reset_editor, get_human_suggestions, done
 Approved skills: {{skill_manifest}}
@@ -226,7 +226,7 @@ Remaining budgets: code_repairs={{code_repairs}}, submissions={{submissions}}
 
 🚨 HUMAN SKIP DIRECTIVES: Always honor human user instructions! If the human user says "task 1 completed", "skip task", "go to next problem", or "done", call `skip_current_task(reason="User instructed to skip")` immediately.
 
-🚨 SUBMISSION VERIFICATION & TEST CASE METRIC MANDATE (CRITICAL): Many coding platforms DO NOT display a "Congratulations" banner after submission. Instead, they display passed vs failed test case counts (e.g. "5/5 Test Cases Passed", "0 Failed", "Passed: 5, Failed: 0"). Evaluate success strictly based on test case metrics (0 failed test cases). Call `verify_submission_status` after clicking Submit to inspect test results.
+🚨 SUBMISSION VERIFICATION & TEST CASE METRIC MANDATE (CRITICAL): Many coding platforms DO NOT display a "Congratulations" banner after submission. Instead, they display passed vs failed test case counts (e.g. "5/5 Test Cases Passed", "0 Failed", "Passed: 5, Failed: 0"). Accept verified complete test counts OR a fresh explicit platform confirmation that the current block, lesson, or task is completed. Test counts are not mandatory when completion is explicit. Failure evidence overrides a celebration message. Use `verify_submission_status` to read the existing result; never rewrite merely because counts are absent.
 
 🚨 PARTIAL TEST PASS IS A FAILURE MANDATE (CRITICAL — VIOLATION = FAILURE): If less than 100% of test cases pass (for example 7 out of 8 passed, 3/4 passed, or 9/10 passed), THE SUBMISSION IS A FAILURE AND NOT COMPLETE. You are STRICTLY PROHIBITED from calling `done` or `report_task_result(success=True)` when ANY test cases are failing! If 7/8 test cases pass, you MUST analyze why test case #8 or hidden test cases failed (check boundary conditions, empty inputs, edge cases, data types, constraints, or formatting), edit your code using `submit_code_solution` or `write_code_to_editor`, and resubmit until 100% of test cases (e.g. 8/8) pass!
 
@@ -238,11 +238,11 @@ YOUR CURRENT TASK (Task #{{task_id}}):
 EXECUTION STEPS (LIGHTNING 2-STEP WORKFLOW):
 1. Locate the target code editor in the already-selected task workspace. The orchestrator has selected this task; do not click Next again or interpret the queue position as a platform question number.
 2. READ THE EDITOR BOILERPLATE FIRST (CRITICAL): Call `read_code_from_editor` to fetch the current contents of the editor. Inspect any existing boilerplate code, required class/method structures, package imports, comments, or template code. You MUST preserve and implement your solution within this template structure!
-3. CALL `submit_code_solution(code=...)`: Call `submit_code_solution` with your complete solution code. This action automatically injects the code, clicks 'Submit', and verifies test cases in 1 single step!
+3. CALL `submit_code_solution(code=...)`: Call `submit_code_solution` with your complete solution code. This action preserves matching code, chooses an available validation control, and checks completion evidence.
 4. VERIFY SUBMISSION METRICS:
    - If 100% of test cases passed (e.g. 8/8 passed, 0 failed), DO NOT click Submit again! Call `report_task_result(success=True)` and finish with `done`.
    - If ANY test cases failed (e.g. 7/8 passed), DO NOT call done or report success! Read the error/failed test cases, fix your code with `submit_code_solution`, and resubmit until 100% pass!
-5. Finally, call the `done` action ONLY when 100% of test cases pass! 🚨 The `done` action accepts ONLY the `text` parameter — do NOT pass `success`, `files_to_display`, or any other extra fields!
+5. Finish after the verification tool confirms all tests passed or explicit platform completion. If the tool reports pending evidence, preserve the code and inspect that result. For a genuine inability, use done(success=False, text=the actual reason).
 
 🚫 ANTI-LOOP RULES (CRITICAL — VIOLATION = FAILURE):
 - Do NOT click "Run Code" or "Run" more than once per code change. If you already clicked it and it is compiling/running, WAIT for the output.
@@ -324,14 +324,17 @@ _EXECUTION_TASK_TEMPLATE = """\
 Target element / navigation: {{target_selector}}.
 Expected result: {{expected_behavior}}.
 
-Clear any existing code, write the correct solution using `write_code_to_editor`, and click 'Run Code' or 'Run'.
-Wait for the test cases to finish running (verify by checking the output console).
-Once test cases pass, use `submit_code_solution` with the complete current solution. This records the submission and its previous verdict; do not bypass it with a generic Submit click.
-Call `verify_submission_status` to verify test case counts.
+Preserve required boilerplate and implement the solution using `write_code_to_editor`.
+Use `submit_code_solution` with the complete current solution to discover this page's completion workflow.
+It can submit, check code, run tests, or inspect automatic lesson completion. Do not assume Submit exists.
+For unfamiliar controls, inspect their actual purpose and use completion_control with the exact observed validation label. Never invent a button or use navigation as validation.
+Next Lesson or Continue is navigation, not proof of correctness. Verify the current task before advancing.
+If the page has no validation controls or machine-readable verdict, inspect the preview and ask for confirmation; do not keep polling for a missing button.
+Call `verify_submission_status` to inspect test counts or an explicit current-task completion message. Counts are not required when the platform confirms completion.
 Continue in the already selected task page; do not reopen its URL or reload to check results.
 An unknown verdict or verification timeout is not a failed test. Preserve the code and submission.
 If verification reaches its deadline or the page is unresponsive, call pause_for_human instead of reloading or retrying indefinitely.
-If 100% of test cases pass (0 failed), call `report_task_result(success=True)` and finish with `done`.
+If the verification tool confirms all tests passed or explicit platform completion, call `report_task_result(success=True)` and finish with `done`.
 If ANY test cases fail (e.g. 7/8 passed), DO NOT call done or report success! You MUST fix your code with `write_code_to_editor` and resubmit until 100% pass.
 """
 

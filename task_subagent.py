@@ -30,7 +30,7 @@ from models import (
     VerificationResult,
     WorkspaceSnapshot,
 )
-from platform_adapters import detect_platform
+from platform_adapters import detect_platform, result_fingerprint
 from prompts import get_execution_system_prompt, get_execution_task_prompt
 from state_machine import can_transition, transition
 from verification import is_submission_successful, parse_test_results, is_result_stale
@@ -63,6 +63,35 @@ class TaskSubagent:
         task_id_num = task.queue_index + 1
         if str(task.task_id).replace("task-", "").isdigit():
             task_id_num = int(str(task.task_id).replace("task-", ""))
+
+        # A verification timeout is not permission to generate or submit again.
+        if task.submissions and not task.submissions[-1].terminal:
+            orch._log('Checking the existing test result; preserving the current code.', 'info')
+            try:
+                async def inspect_existing():
+                    browser = await orch.browser_mgr.get_browser()
+                    page = await orch._get_current_page_safe(browser)
+                    adapter = await detect_platform(page)
+                    return await adapter.parse_result(page)
+                record = await asyncio.wait_for(inspect_existing(), timeout=10.0)
+                baseline = getattr(orch, '_submission_baseline', None)
+                fresh = (baseline is None or getattr(orch, '_submission_observed_pending', False)
+                         or result_fingerprint(record) != result_fingerprint(baseline))
+                if not record.terminal:
+                    orch._submission_observed_pending = True
+                if record.terminal and fresh:
+                    previous = task.submissions[-1]
+                    record.task_id = previous.task_id
+                    record.code_hash = previous.code_hash
+                    task.submissions.append(record)
+                    success = is_submission_successful(record) and not is_result_stale(record, task)
+                    orch._task_completed_successfully = success
+                    return TaskExecutionResult(task_id=str(task.task_id), success=success,
+                                               output_message='Existing test result verified.' if success else 'Existing tests report a failure.')
+            except Exception as exc:
+                orch._log(f'Could not read the existing result: {exc}', 'warn')
+            return TaskExecutionResult(task_id=str(task.task_id), success=False,
+                                       output_message='The existing result is still unverified. Code and page were preserved.')
 
         orch._task_completed_successfully = False
         orch._code_written_in_current_task = False
@@ -264,6 +293,10 @@ class TaskSubagent:
         # No code was changed: this is an execution/provider failure, not a code
         # repair. Return its real cause before optional browser diagnostics.
         errors = [str(e) for e in (history.errors() if history else []) if e]
+        for action_result in getattr(getattr(agent, 'state', None), 'last_result', []) or []:
+            error = getattr(action_result, 'error', None)
+            if error and str(error) not in errors:
+                errors.append(str(error))
         invalid_model_response = any(
             marker in error.lower() for error in errors
             for marker in ('json_invalid', 'invalid or incomplete json', 'invalid json')
@@ -271,7 +304,12 @@ class TaskSubagent:
         if not recovered_success and not getattr(orch, '_task_completed_successfully', False) and (
             not getattr(orch, '_code_written_in_current_task', False) or invalid_model_response
         ):
-            reason = errors[-1] if errors else 'Agent stopped without writing code or submitting a solution'
+            final_text = history.final_result() if history and callable(getattr(history, 'final_result', None)) else None
+            reason = errors[-1] if errors else (
+                f'Agent ended before verified execution: {final_text}' if final_text else
+                'Agent returned without writing code and without a final explanation. No completion was verified.'
+            )
+            orch._log(reason, 'error')
             return TaskExecutionResult(task_id=str(task.task_id), queue_index=task.queue_index,
                                        success=False, error_log=errors, output_message=reason)
 

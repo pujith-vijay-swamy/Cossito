@@ -15,6 +15,26 @@ from verification import (
 
 
 class TestVerification(unittest.TestCase):
+    def test_passed_all_word_orders_and_negatives(self):
+        for text in ('Horray!!! You have passed all the test cases. Would you like to mark this block as completed?',
+                     'You passed all tests.', 'All test cases have passed.'):
+            self.assertTrue(is_submission_successful(parse_test_results(text)), text)
+        for text in ('You have not passed all the test cases.', 'When you passed all tests, a message appeared.',
+                     'You passed all tests. 2 passed, 1 failed'):
+            self.assertFalse(is_submission_successful(parse_test_results(text)), text)
+
+    def test_completion_announcements_without_test_counts(self):
+        for text in ('Hooray! You completed this block!',
+                     "You've successfully completed the exercise.",
+                     'This lesson has been successfully completed.'):
+            with self.subTest(text=text):
+                self.assertTrue(is_submission_successful(parse_test_results(text)))
+        for text in ('When you completed this block, you should have seen a message.',
+                     'You have not completed this block.',
+                     'Hooray! You completed this block! 2 passed, 1 failed'):
+            with self.subTest(text=text):
+                self.assertFalse(is_submission_successful(parse_test_results(text)))
+
     def test_submission_success_formula(self):
         # 1. Terminal + total > 0 + passed == total + failed == 0 -> True
         rec1 = SubmissionRecord(

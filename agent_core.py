@@ -759,7 +759,9 @@ class AgentOrchestrator:
 
             if self._execution_blocked_reason:
                 self._set_phase(AgentPhase.PAUSED_HITL)
-                self.state.hitl_reason = f"Execution stopped before writing code: {self._execution_blocked_reason}. Check the page or model connection, then Resume to re-read the task."
+                pending_result = bool(task.submissions and not task.submissions[-1].terminal)
+                next_step = 'Resume to check the existing result without rewriting code.' if pending_result else 'Check the page or model connection, then Resume to re-read the task.'
+                self.state.hitl_reason = f"Execution paused: {self._execution_blocked_reason.rstrip('.')}. {next_step}"
                 self._log(self.state.hitl_reason, "error")
                 self._notify()
                 await self.hitl.trigger_pause(self.state.hitl_reason)
@@ -1061,7 +1063,7 @@ class AgentOrchestrator:
     def _is_workspace_url(self, current_url: str) -> bool:
         """Task scope is independent of whether an external site is safe to visit."""
         try:
-            target, current = urlsplit(self.url), urlsplit(current_url)
+            target, current = urlsplit(self._workspace_url), urlsplit(current_url)
             def origin(parts):
                 return (parts.scheme.lower(), parts.hostname,
                         parts.port or (443 if parts.scheme == 'https' else 80))
@@ -1081,10 +1083,14 @@ class AgentOrchestrator:
             current_url = await page.get_url()
             if self._is_workspace_url(current_url):
                 return False
+            if getattr(self, '_workspace_restore_failed', False):
+                raise RuntimeError('Workspace restoration previously failed. Preserving the page instead of repeatedly navigating; restart the run with the final target URL.')
             self._log("Reference navigation left the task workspace; restoring the selected task.", "warn")
+            self._workspace_restore_failed = True
             await page.goto(self._workspace_url)
             if not self._is_workspace_url(await page.get_url()):
                 raise RuntimeError("Could not restore the task workspace; refusing to edit an unrelated page.")
+            self._workspace_restore_failed = False
         # Some platforms change questions without changing the URL. Reselect
         # the current task after a reload, outside the lock because navigation
         # itself obtains a guarded page.

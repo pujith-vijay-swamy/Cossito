@@ -38,12 +38,12 @@ class SubmissionDeadlineTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('timed out',result)
         self.assertIn('Do not reload',result)
 
-    async def test_expired_window_does_not_touch_browser(self):
+    async def test_expired_window_reads_once_before_reporting_unknown(self):
         action = self.setup_action()
         self.orch._submission_check_window = (self.task.task_id, time.monotonic()-61)
         result = await action()
         self.assertIn('deadline reached',result)
-        self.orch.browser_mgr.get_browser.assert_not_awaited()
+        self.orch.browser_mgr.get_browser.assert_awaited_once()
 
     async def test_unknown_result_does_not_claim_tests_running(self):
         action = self.setup_action()

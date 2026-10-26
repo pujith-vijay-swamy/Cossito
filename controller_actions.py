@@ -16,6 +16,7 @@ import time
 from typing import Any, Optional
 
 from browser_use import Controller
+from browser_use.agent.views import ActionResult
 
 from editor_adapters import safe_write
 from llm_provider import get_llm
@@ -60,6 +61,45 @@ def consume_suggestions_block(orchestrator, context_name: str = "", inline: bool
 def build_controller(orchestrator) -> Controller:
     """Create a Controller with custom agent actions."""
     controller = Controller()
+    premature_completions = 0
+
+    @controller.action('Finish reconnaissance, or finish execution only after verified completion. Report genuine inability with success=False and its reason.')
+    async def done(text: str, success: bool = True) -> ActionResult:
+        nonlocal premature_completions
+        task = getattr(orchestrator, '_current_task', None)
+        if task is None or not success or getattr(orchestrator, '_task_completed_successfully', False) or getattr(orchestrator, '_user_skip_requested', False):
+            return ActionResult(is_done=True, success=success, extracted_content=text)
+        cached = getattr(orchestrator, '_completion_write_baseline', None)
+        if (getattr(orchestrator, '_code_written_in_current_task', False)
+                and cached and cached[0][0] == getattr(task, 'task_id', None)):
+            await verify_submission_status()
+            if getattr(orchestrator, '_task_completed_successfully', False):
+                return ActionResult(is_done=True, success=True, extracted_content=text)
+        premature_completions += 1
+        wrote_code = getattr(orchestrator, '_code_written_in_current_task', False)
+        instruction = (
+            'Use write_code_to_editor with the solution, then submit_code_solution to validate the current task.'
+            if not wrote_code else
+            'Use submit_code_solution or verify_submission_status to obtain current completion evidence. Do not rewrite working code just to finish.'
+        )
+        message = f'Completion rejected: this task has no verified result. {instruction}'
+        orchestrator._log(message, 'warn')
+        if premature_completions >= 3:
+            reason = f'The model repeatedly requested completion without verification. Last explanation: {text}'
+            return ActionResult(is_done=True, success=False, extracted_content=reason)
+        # Feedback is not a tool error: the agent gets another step to act on it
+        # without triggering the provider-failure threshold or restarting the run.
+        return ActionResult(is_done=False, extracted_content=message, long_term_memory=message)
+
+    async def completion_baseline(page, task, code):
+        key = (getattr(task, 'task_id', None), hashlib.sha256(code.encode('utf-8')).hexdigest())
+        cached = getattr(orchestrator, '_completion_write_baseline', None)
+        if cached and cached[0] == key:
+            return cached[1]
+        adapter = await _get_sym('detect_platform', detect_platform)(page)
+        record = await asyncio.wait_for(adapter.parse_result(page), timeout=10.0)
+        orchestrator._completion_write_baseline = (key, record)
+        return record
 
     @controller.action(
         "Extract the complete, raw, untruncated problem description, sample inputs/outputs, and constraints directly from the DOM. "
@@ -536,9 +576,19 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             if current_task is None and orchestrator.state.task_queue and orchestrator.state.task_queue.tasks:
                 current_task = orchestrator.state.task_queue.tasks[orchestrator.state.current_task_index]
 
-            if current_task is None or getattr(orchestrator, '_submission_started_task_id', None) != current_task.task_id:
-                return ('No confirmed submission has been started for this task. Use submit_code_solution '
-                        'to submit the current solution before verifying; running tests alone is not a submission.' + suggestions_block)
+            if current_task is None:
+                return 'No active task is available to verify.' + suggestions_block
+            if getattr(orchestrator, '_submission_started_task_id', None) != current_task.task_id:
+                cached = getattr(orchestrator, '_completion_write_baseline', None)
+                if (not getattr(orchestrator, '_code_written_in_current_task', False)
+                        or not cached or cached[0][0] != current_task.task_id):
+                    return 'No tracked code write or validation attempt exists for this task.' + suggestions_block
+                # Automatic validation and native Run Tests clicks are legitimate
+                # workflows. Require fresh evidence relative to the tracked write.
+                orchestrator._submission_baseline = cached[1]
+                orchestrator._submission_started_task_id = current_task.task_id
+                orchestrator._submission_observed_pending = False
+                orchestrator._submission_check_window = None
 
             task_key = getattr(current_task, 'task_id', None)
             window = getattr(orchestrator, '_submission_check_window', None)
@@ -546,12 +596,6 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                 window = (task_key, time.monotonic())
                 orchestrator._submission_check_window = window
             remaining = 60.0 - (time.monotonic() - window[1])
-            if remaining <= 0:
-                return (
-                    'Submission verification deadline reached; the outcome is unknown. '
-                    'Do not reload, rewrite, resubmit, or keep checking. Call pause_for_human '
-                    f'to inspect the existing submission and preserve the page.{suggestions_block}'
-                )
 
             async def read_submission():
                 browser = await orchestrator.browser_mgr.get_browser()
@@ -561,7 +605,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                 adapter = await _get_sym("detect_platform", detect_platform)(page)
                 return await adapter.parse_result(page)
 
-            record = await asyncio.wait_for(read_submission(), timeout=min(10.0, remaining))
+            # The polling deadline must not hide a verdict that arrived later.
+            # Each explicit check gets one bounded read, never a new polling loop.
+            record = await asyncio.wait_for(read_submission(), timeout=10.0)
 
             baseline = getattr(orchestrator, '_submission_baseline', None)
             if not record.terminal:
@@ -580,6 +626,10 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                     record.code_hash = hashlib.sha256(current_task.solution_code.encode("utf-8")).hexdigest()[:16]
 
             if not record.terminal:
+                if remaining <= 0:
+                    return ('Submission verification deadline reached; the outcome is unknown. '
+                            'Do not reload, rewrite, resubmit, or keep checking. Call pause_for_human '
+                            'to inspect the existing submission and preserve the page.' + suggestions_block)
                 return f"No final submission verdict is visible yet. Preserve the page and code; do not reload or resubmit. Wait briefly before checking again.{suggestions_block}"
 
             orchestrator._submission_check_window = None
@@ -695,6 +745,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             if page is None:
                 return f"Error: Active page unavailable.{suggestions_block}"
 
+            await completion_baseline(page, current_task, code)
             for attempt in range(1, 4):
                 orchestrator._log(f"⚡ Editor write attempt {attempt}/3...")
                 try:
@@ -721,7 +772,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                         orchestrator.state.current_solution_code = None
                         orchestrator.state.failed_injection_code = None
                         orchestrator._notify()
-                        return f"Success: Code written and verified in {editor_name}. Proceed to click Submit or call submit_code_solution.{suggestions_block}"
+                        return f"Success: Code written and verified in {editor_name}. Call submit_code_solution to discover and verify this page's completion workflow.{suggestions_block}"
                 except Exception as e:
                     orchestrator._log(f"⚠️ Attempt {attempt} failed with exception: {e}", "warn")
 
@@ -740,10 +791,11 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             return f"Error writing code to editor: {e}{suggestions_block}"
 
     @controller.action(
-        "FAST-PATH LIGHTNING SOLVER: Inject your solution code into the editor AND click 'Submit' on the page in 1 single step. "
-        "Use this action as your primary tool to solve, submit, and verify test cases at maximum speed!"
+        "Write the solution and discover the page's completion workflow: Submit, Check, Run Tests, or automatic validation. "
+        "Verify completion without clicking Next prematurely. This also supports pages without a Submit button. "
+        "For a custom validation control, pass completion_control with its exact observed visible label; never invent a label or select navigation."
     )
-    async def submit_code_solution(code: str) -> str:
+    async def submit_code_solution(code: str, completion_control: Optional[str] = None) -> str:
         # Check for stop request
         if hasattr(orchestrator, "control_flags") and orchestrator.control_flags and orchestrator.control_flags.get("stop_requested"):
             orchestrator._log("🛑 Stop signal detected immediately.", "warn")
@@ -752,7 +804,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
         suggestions_block = consume_suggestions_block(orchestrator, "submit_code_solution")
 
         try:
-            orchestrator._log("⚡ Fast-Path: Injecting code solution and clicking Submit...")
+            orchestrator._log("Writing the solution and discovering the page's completion workflow...")
             orchestrator._code_written_in_current_task = True
             orchestrator.state.current_solution_code = code
             orchestrator._notify()
@@ -770,6 +822,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                 return f"Error: Active page unavailable.{suggestions_block}"
 
             # 1. Safe write code
+            baseline = await completion_baseline(page, current_task, code)
             write_success, snap_before, readback = await _get_sym("safe_write", safe_write)(page, code)
             if not write_success:
                 direct_res = await orchestrator._inject_code_direct(browser, code)
@@ -796,29 +849,47 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
             # 2. Submit via platform adapter
             adapter = await _get_sym("detect_platform", detect_platform)(page)
-            baseline = await asyncio.wait_for(adapter.parse_result(page), timeout=10.0)
             orchestrator._submission_baseline = baseline
             orchestrator._submission_observed_pending = False
-            clicked = await adapter.click_submit(page)
-            if clicked:
+            existing = await asyncio.wait_for(adapter.parse_result(page), timeout=10.0)
+            existing_success, _ = _get_sym("verify_submission", verify_submission)(existing, current_task or CodingTask())
+            already_complete = existing_success and result_fingerprint(existing) != result_fingerprint(baseline)
+            completion = ({'mode': 'automatic', 'started': False} if already_complete else
+                          await asyncio.wait_for(adapter.start_completion(page, completion_control), timeout=10.0))
+            started = completion.get('started', False)
+            mode = completion.get('mode', 'unknown')
+            if started or mode in ('automatic', 'navigation'):
                 orchestrator._submission_started_task_id = current_task.task_id if current_task else None
                 orchestrator._submission_check_window = (current_task.task_id if current_task else None, time.monotonic())
-                orchestrator._log("⚡ Submit button clicked successfully.", "success")
+                orchestrator._log(f"Completion workflow: {mode}" + (f" — {completion.get('label', '')}" if started else ' — inspecting page evidence'), "info")
             else:
-                orchestrator._log("Submit was not clicked; skipping the result wait.", "warn")
-                return f"Submission was not started: no enabled Submit control was clicked. Inspect the current page and submit control before retrying; do not wait for tests that have not started.{suggestions_block}"
+                return f"Completion was not started: the validation control is unavailable or disabled. Visible controls: {completion.get('controls', [])}. Inspect why it is unavailable; do not wait for a nonexistent submission.{suggestions_block}"
 
             if current_task and can_transition(current_task, TaskState.VERIFYING):
                 transition(current_task, TaskState.VERIFYING)
 
             # 3. Wait for terminal result & verify
-            record = await _get_sym("wait_for_terminal", wait_for_terminal)(page, adapter, timeout=30.0, poll_interval=1.0, baseline=baseline)
+            def remember_pending():
+                orchestrator._submission_observed_pending = True
+
+            record = existing if already_complete else await _get_sym("wait_for_terminal", wait_for_terminal)(page, adapter, timeout=30.0 if started else 3.0, poll_interval=0.5, baseline=baseline, on_pending=remember_pending)
+            orchestrator._log(f"Completion evidence: outcome={record.outcome}, terminal={record.terminal}, passed={record.passed_count}/{record.total_count}; {record.raw_output[:300]}", 'info')
             if current_task:
                 record.task_id = current_task.task_id
                 record.code_hash = new_snap.content_hash
                 current_task.submissions.append(record)
 
             if not record.terminal:
+                if not started:
+                    orchestrator._submission_started_task_id = None
+                    return (
+                        f"This page uses {mode} completion and has no discovered Submit/Check/Run control. "
+                        f"Observed controls: {completion.get('controls', [])}. No fresh completion evidence is visible. "
+                        "Do not wait for Submit or click Next as proof of success. If an observed control validates this task, "
+                        "call this action with completion_control set to its exact label. Otherwise inspect the rendered preview and "
+                        "the page's completion requirements; request human confirmation if it provides no machine-readable verdict."
+                        + suggestions_block
+                    )
                 return (
                     "Submission has no confirmed final result yet. Do not submit again or rewrite code "
                     "because of this wait timeout. Call verify_submission_status to inspect the existing "

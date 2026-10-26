@@ -794,6 +794,12 @@ async def safe_write(page: Any, code: str, adapter: Optional[EditorAdapter] = No
                 continue
 
             last_snap = await ad.snapshot(page)
+            # Re-submitting unchanged code must not fire editor change events
+            # which can clear a platform's already-visible validation result.
+            if normalize(last_snap.content) == norm_code:
+                readback_content = await ad.readback(page)
+                if normalize(readback_content) == norm_code:
+                    return True, last_snap, readback_content
             success = await ad.write(page, code)
             readback_content = await ad.readback(page)
             last_readback = readback_content

@@ -216,8 +216,13 @@ class ReconEngine:
         current_url = await page.get_url()
 
         # ⚡ Direct Fast-Track Reconnaissance Engine (Instant 1.5s vs 60-90s)
+        # Keep the destination reached by startup/login redirects as the
+        # workspace. The original input may use HTTP or a noncanonical host.
         self._orch._log("Waiting for the main page content before reading tasks...", "info")
         await wait_for_page_ready(page)
+        current_url = await page.get_url()
+        await self._orch._hitl_gate(current_url)
+        self._orch._workspace_url = current_url
         if page is not None:
             try:
                 # Progressive hydration poll: single-page applications take 2-4s to load markdown/tabs

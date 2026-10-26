@@ -15,6 +15,20 @@ test('submission busy state ignores unrelated loaders and honors actual test act
   const browser = await chromium.launch({headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined});
   try {
     const page = await browser.newPage();
+    await page.setContent('<div class="group/sidebar-wrapper"><main><div><button>Previous</button><button disabled><span>Completed</span></button><button>Next Lesson</button></div></main></div>');
+    assert.match(await page.evaluate(readResult), /Current task completed/);
+    await page.setContent('<aside><button disabled>Completed</button><button>Next Lesson</button></aside><main><button>Mark as completed</button><button>Next Lesson</button></main>');
+    assert.equal(await page.evaluate(readResult), '');
+    await page.setContent('<main><div class="celebration"><h2>Hooray! You completed this block!</h2><button>Next lesson</button></div></main>');
+    assert.match(await page.evaluate(readResult), /You completed this block/);
+    await page.setContent('<main><p>When you completed this block, you should have seen a message.</p><div hidden>You completed this block!</div><div id="__omnitasker_panel"><p>You completed this block!</p></div></main>');
+    assert.equal(await page.evaluate(readResult), '');
+    await page.setContent('<h2>You completed this block!</h2><div class="test-results">2 passed, 1 failed</div>');
+    assert.match(await page.evaluate(readResult), /1 failed/);
+    await page.setContent('<ul id="tests"><li><span aria-label="Passed"></span>List exists</li><li><span title="Passed"></span>Items exist</li></ul>');
+    assert.equal(await page.evaluate(readResult), '2 passed, 0 failed');
+    await page.setContent('<ul class="test-results"><li>Passed: List exists</li><li>Failed: Items exist</li></ul>');
+    assert.equal(await page.evaluate(readResult), '1 passed, 1 failed');
     await page.setContent('<div class="editor"><span class="spinner">Loading editor</span></div><div class="test-results">All tests passed</div>');
     assert.equal(await page.evaluate(readStatus), 'All tests passed');
     await page.setContent('<div id="__omnitasker_panel"><span class="spinner">Working</span></div><div class="test-results">All tests passed</div>');

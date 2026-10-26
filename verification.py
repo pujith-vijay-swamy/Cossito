@@ -95,15 +95,30 @@ def parse_test_results(raw_text: str) -> SubmissionRecord:
 
     # Check for terminal status keywords
     has_accepted_kw = bool(
-        re.search(r'\b(accepted|all\s+test\s*cases?\s+passed|all\s+tests?\s+passed|congratulations|correct\s+answer|status:\s*success|submission\s+successful|100%\s+passed|100%\s+test\s*cases?\s+passed)\b', text_lower)
+        re.search(r'\b(accepted|(?:lesson|challenge|exercise|task)\s+(?:is\s+)?complet(?:e|ed)|all\s+test\s*cases?\s+passed|all\s+tests?\s+passed|congratulations|correct\s+answer|status:\s*success|submission\s+successful|100%\s+passed|100%\s+test\s*cases?\s+passed)\b', text_lower)
     )
+    # Platforms may confirm completion without exposing a test count or Submit.
+    # Require an affirmative completed state, not instructions or future promises.
+    completion = bool(re.search(
+        r"\byou(?:\s+have|'ve)?\s+(?:successfully\s+)?completed\s+(?:(?:this|the|your)\s+)?(?:block|lesson|challenge|exercise|task|step|project)\b"
+        r"|\b(?:block|lesson|challenge|exercise|task|step|project)\s+(?:(?:is|has\s+been)\s+)?(?:successfully\s+)?completed\b",
+        text_lower.replace('’', "'")))
+    conditional = bool(re.search(r'\b(if|when|once|until|after)\s+you\b|\b(?:not|never)\s+(?:yet\s+)?completed\b', text_lower))
+    has_accepted_kw = has_accepted_kw or (completion and not conditional)
+    passed_all = bool(re.search(
+        r'\b(?:you\s+(?:have\s+)?|successfully\s+)?passed\s+all\s+(?:of\s+)?(?:the\s+)?(?:test\s*cases?|tests?|checks?)\b'
+        r'|\ball\s+(?:test\s*cases?|tests?|checks?)\s+(?:(?:have|has)\s+)?(?:successfully\s+)?passed\b', text_lower))
+    negated_pass = bool(re.search(r"\b(?:not|never|haven't|hasn't)\s+(?:yet\s+)?passed\b|\b(?:if|when|once|until)\s+you\b", text_lower))
+    has_accepted_kw = has_accepted_kw or (passed_all and not negated_pass)
     has_failure_kw = bool(
         re.search(r'\b(wrong\s+answer|time\s+limit\s+exceeded|runtime\s+error|compilation\s+error)\b', text_lower)
     )
+    tests_failed = bool(re.search(r'\b(?:test\s*cases?|tests?|checks?|validation)\s+(?:(?:have|has)\s+)?failed\b', text_lower))
+    has_failure_kw = has_failure_kw or tests_failed
 
     if has_accepted_kw and not has_failure_kw:
         record.outcome = "accepted"
-    elif "wrong answer" in text_lower:
+    elif "wrong answer" in text_lower or tests_failed:
         record.outcome = "wrong_answer"
     elif "time limit exceeded" in text_lower:
         record.outcome = "time_limit_exceeded"

@@ -65,6 +65,44 @@ class StartupTests(unittest.IsolatedAsyncioTestCase):
         await self.manager.open_target_page('https://example.com')
         self.assertEqual(self.page.url, 'https://example.com')
 
+    async def test_no_initial_page_waits_through_blank_after_navigate(self):
+        self.browser.get_current_page.side_effect = [None, None, self.page, self.page]
+        async def navigate(url):
+            asyncio.get_running_loop().call_later(.15, setattr, self.page, 'url', url)
+        self.browser.navigate_to = AsyncMock(side_effect=navigate)
+        result = await self.manager.open_target_page('https://example.com', timeout=1)
+        self.assertIs(result, self.page)
+        self.browser.navigate_to.assert_awaited_once()
+        self.page.goto.assert_not_awaited()
+
+    async def test_transient_internal_url_is_not_navigation_failure(self):
+        async def navigate(url):
+            self.page.url = 'about:blank#loading'
+            asyncio.get_running_loop().call_later(.01, setattr, self.page, 'url', url)
+        self.page.goto.side_effect = navigate
+        await self.manager.open_target_page('https://example.com', timeout=1)
+        self.page.goto.assert_awaited_once()
+
+    async def test_replaced_page_is_reacquired(self):
+        replacement = SimpleNamespace(get_url=AsyncMock(return_value='https://example.com/login'))
+        self.page.goto = AsyncMock()
+        self.browser.get_current_page.side_effect = [self.page, replacement]
+        result = await self.manager.open_target_page('https://example.com', timeout=1)
+        self.assertIs(result, replacement)
+
+    async def test_permanently_blank_page_times_out_without_renavigation(self):
+        self.page.goto = AsyncMock()
+        with self.assertRaisesRegex(RuntimeError,'did not become available'):
+            await self.manager.open_target_page('https://example.com', timeout=.03)
+        self.page.goto.assert_awaited_once()
+
+    async def test_browser_network_error_is_reported(self):
+        async def navigate(url):
+            self.page.url = 'chrome-error://chromewebdata/'
+        self.page.goto.side_effect = navigate
+        with self.assertRaisesRegex(RuntimeError,'network error page'):
+            await self.manager.open_target_page('https://example.com', timeout=1)
+
     async def test_profile_locks_preserved_and_shared_instance(self):
         lock = Path(self.temp.name)/'DevToolsActivePort'
         lock.write_text('live browser')

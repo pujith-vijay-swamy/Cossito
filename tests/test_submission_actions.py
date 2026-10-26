@@ -8,6 +8,45 @@ from models import CodingTask, WorkspaceSnapshot, SubmissionRecord
 
 
 class TestSubmissionActions(unittest.IsolatedAsyncioTestCase):
+    async def test_done_verifies_native_validation_after_tracked_write(self):
+        task = CodingTask(solution_code='code')
+        orch = SimpleNamespace(control_flags={}, _current_task=task, _log=Mock(), _notify=Mock(),
+            _code_written_in_current_task=True, _task_completed_successfully=False,
+            _completion_write_baseline=((task.task_id, 'hash'), SubmissionRecord(terminal=False)),
+            state=SimpleNamespace(current_task_index=0),
+            browser_mgr=SimpleNamespace(get_browser=AsyncMock(return_value=object())),
+            _get_current_page_safe=AsyncMock(return_value=object()), _current_agent_task=None)
+        adapter = SimpleNamespace(parse_result=AsyncMock(return_value=SubmissionRecord(
+            terminal=True, outcome='accepted', raw_output='You completed this block!')))
+        with patch('controller_actions._get_sym', side_effect=lambda name, fallback: fallback), \
+             patch('controller_actions.detect_platform', new=AsyncMock(return_value=adapter)):
+            action = build_controller(orch).registry.registry.actions['done'].function
+            result = await action(text='The platform confirms completion')
+        self.assertTrue(result.is_done)
+        self.assertTrue(result.success)
+        self.assertTrue(orch._task_completed_successfully)
+        self.assertEqual(len(task.submissions), 1)
+
+    async def test_fresh_completion_does_not_click_or_poll_again(self):
+        task = CodingTask()
+        orch = SimpleNamespace(control_flags={}, _current_task=task, _log=Mock(), _notify=Mock(),
+            state=SimpleNamespace(current_solution_code='', current_task_index=0),
+            browser_mgr=SimpleNamespace(get_browser=AsyncMock(return_value=object())),
+            _get_current_page_safe=AsyncMock(return_value=object()), _current_agent_task=None)
+        adapter = SimpleNamespace(start_completion=AsyncMock(), parse_result=AsyncMock(side_effect=[
+            SubmissionRecord(terminal=False),
+            SubmissionRecord(terminal=True, outcome='accepted', raw_output='You completed this block!')]))
+        with patch('controller_actions._get_sym', side_effect=lambda name, fallback: fallback), \
+             patch('controller_actions.safe_write', new=AsyncMock(return_value=(True, WorkspaceSnapshot(content='code'), 'code'))), \
+             patch('controller_actions.detect_platform', new=AsyncMock(return_value=adapter)), \
+             patch('controller_actions.wait_for_terminal', new=AsyncMock()) as wait:
+            action = build_controller(orch).registry.registry.actions['submit_code_solution'].function
+            message = await action(code='code')
+        self.assertIn('VERIFIED SUCCESSFUL', message)
+        adapter.start_completion.assert_not_awaited()
+        wait.assert_not_awaited()
+        self.assertTrue(orch._task_completed_successfully)
+
     async def check_not_started(self, write_ok, click_ok):
         task = CodingTask()
         orch = SimpleNamespace(
@@ -17,7 +56,7 @@ class TestSubmissionActions(unittest.IsolatedAsyncioTestCase):
             _get_current_page_safe=AsyncMock(return_value=object()),
             _inject_code_direct=AsyncMock(return_value=None),
         )
-        adapter = SimpleNamespace(click_submit=AsyncMock(return_value=click_ok), parse_result=AsyncMock(return_value=SubmissionRecord()))
+        adapter = SimpleNamespace(start_completion=AsyncMock(return_value={'mode':'disabled', 'started':click_ok}), parse_result=AsyncMock(return_value=SubmissionRecord()))
         with patch('controller_actions._get_sym', side_effect=lambda name, fallback: fallback), \
              patch('controller_actions.safe_write', new=AsyncMock(return_value=(write_ok, WorkspaceSnapshot(), ''))), \
              patch('controller_actions.detect_platform', new=AsyncMock(return_value=adapter)), \
@@ -32,9 +71,9 @@ class TestSubmissionActions(unittest.IsolatedAsyncioTestCase):
     async def test_failed_write_does_not_submit_or_wait(self):
         message, adapter = await self.check_not_started(False, True)
         self.assertIn('Submission was not attempted', message)
-        adapter.click_submit.assert_not_awaited()
+        adapter.start_completion.assert_not_awaited()
 
     async def test_missing_submit_control_does_not_wait_for_results(self):
         message, adapter = await self.check_not_started(True, False)
-        self.assertIn('Submission was not started', message)
-        adapter.click_submit.assert_awaited_once()
+        self.assertIn('Completion was not started', message)
+        adapter.start_completion.assert_awaited_once()

@@ -21,8 +21,42 @@ from verification import parse_test_results
 logger = logging.getLogger(__name__)
 
 
+COMPLETION_CONTROL_SCRIPT = r"""(requestedLabel) => {
+    const visible = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"]');
+    const controls = Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"], a'))
+        .filter(visible).map(el => ({el, label: (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().replace(/\s+/g, ' '),
+            disabled: el.disabled || el.getAttribute('aria-disabled') === 'true'}));
+    const submit = /^submit(?:\s+(?:code|solution|answer|exercise|challenge))?$/i;
+    const check = /^(?:(?:check|verify|validate)(?:\s+(?:my|your))?(?:\s+(?:code|solution|answer|work))?|run(?:\s+(?:code|tests?|checks))?|test(?:\s+(?:code|solution))?)(?:\s*\([^)]*\))?$/i;
+    const next = /^(?:next(?:\s+(?:lesson|challenge|exercise|task|step))?|continue|(?:submit\s+and\s+)?go\s+to\s+(?:the\s+)?next\s+(?:lesson|challenge)|submit\s+and\s+continue)$/i;
+    if (requestedLabel) {
+        const matches = controls.filter(c => c.label.toLowerCase() === requestedLabel.trim().toLowerCase());
+        if (matches.length !== 1 || matches[0].disabled || next.test(matches[0].label) || /\b(delete|purchase|pay|reset|logout|log out)\b/i.test(matches[0].label)) {
+            return {mode:'unavailable', started:false, controls:controls.map(c=>c.label)};
+        }
+        matches[0].el.click();
+        return {mode:'validate', started:true, label:matches[0].label};
+    }
+    const candidates = controls.filter(c => submit.test(c.label));
+    const validators = controls.filter(c => check.test(c.label));
+    const available = candidates.length ? candidates : validators;
+    const chosen = available.find(c => !c.disabled);
+    if (chosen) {
+        chosen.el.click();
+        return {mode: candidates.length ? 'submit' : 'validate', started: true, label: chosen.label};
+    }
+    if (available.length) return {mode:'disabled', started:false, controls:available.map(c=>c.label)};
+    return {mode: controls.some(c=>next.test(c.label)) ? 'navigation' : 'automatic', started:false,
+        controls:controls.map(c=>c.label).filter(Boolean).slice(0,30)};
+}"""
+
+
 class PlatformAdapter(ABC):
     """Abstract base class for platform-specific adapters."""
+
+    async def start_completion(self, page: Any, control_label: Optional[str] = None) -> dict:
+        """Compatibility default for adapters with a dedicated submit action."""
+        return {'mode': 'submit', 'started': await self.click_submit(page)}
 
     @abstractmethod
     async def detect(self, page: Any) -> bool:
@@ -57,6 +91,19 @@ class PlatformAdapter(ABC):
 
 class GenericAdapter(PlatformAdapter):
     """Progressive detection adapter that handles any standard coding platform."""
+
+    async def start_completion(self, page: Any, control_label: Optional[str] = None) -> dict:
+        """Discover a validation control from visible semantics, never a site name.
+
+        Navigation is reported, not clicked: advancing is the orchestrator's job
+        after the current task has verified completion evidence.
+        """
+        from dom_extraction import parse_eval_result
+        result = await page.evaluate(COMPLETION_CONTROL_SCRIPT, control_label)
+        result = parse_eval_result(result)
+        if not isinstance(result, dict):
+            return {'mode': 'unknown', 'started': False, 'controls': []}
+        return result
 
     async def detect(self, page: Any) -> bool:
         return True
@@ -107,6 +154,9 @@ class GenericAdapter(PlatformAdapter):
             text = str(res) if res is not None else ""
             text_lower = text.lower()
 
+            if text != "evaluating" and parse_test_results(text).outcome == 'accepted':
+                return True
+
             # If unambiguous terminal result is present, it is terminal
             if re.search(r'\b(accepted|all\s+test\s*cases?\s+passed|all\s+tests?\s+passed|congratulations|wrong\s+answer|time\s+limit\s+exceeded|runtime\s+error|compilation\s+error|correct\s+answer|status:\s*success|submission\s+successful|100%\s+passed|100%\s+test\s*cases?\s+passed)\b', text_lower):
                 return True
@@ -143,10 +193,47 @@ class GenericAdapter(PlatformAdapter):
         try:
             res = await page.evaluate(r"""() => {
                 const visible = el => el && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"]') && el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden';
+                const completionMessage = text => /\byou(?:\s+have|'ve)?\s+(?:successfully\s+)?completed\s+(?:(?:this|the|your)\s+)?(?:block|lesson|challenge|exercise|task|step|project)\b|\b(?:block|lesson|challenge|exercise|task|step|project)\s+(?:(?:is|has\s+been)\s+)?(?:successfully\s+)?completed\b/i.test(text.replace(/’/g, "'")) && !/\b(if|when|once|until|after)\s+you\b|\b(?:not|never)\s+(?:yet\s+)?completed\b/i.test(text);
+                // Discover short completion announcements by meaning, even when
+                // the page has no familiar result-container class or submit button.
+                const announcements = Array.from(document.querySelectorAll('[role="status"], [role="alert"], [role="dialog"], h1, h2, h3, p, div, span'))
+                    .filter(el => visible(el) && !el.closest('nav, aside, pre, code, textarea, [contenteditable="true"], [class*="history" i], [class*="description" i], [class*="statement" i]'))
+                    .filter(el => !Array.from(el.children).some(child => visible(child) && completionMessage(child.innerText || '')))
+                    .map(el => (el.innerText || '').trim())
+                    .filter(text => text.length < 500 && completionMessage(text));
+                // A completed-state control persists after celebration toasts
+                // disappear. Scope it to the current lesson's navigation group,
+                // excluding syllabus/history and imperative completion buttons.
+                for (const control of document.querySelectorAll('button, [role="button"], [role="status"]')) {
+                    if (!visible(control) || control.closest('aside, [data-sidebar="sidebar"], [role="navigation"], [class*="history" i], #__omnitasker_panel')) continue;
+                    const label = (control.getAttribute('aria-label') || control.innerText || '').trim();
+                    if (!/^(?:(?:lesson|task|block|exercise|challenge)\s+)?completed$/i.test(label)) continue;
+                    const state = control.disabled || control.getAttribute('aria-disabled') === 'true' || control.getAttribute('role') === 'status';
+                    const group = control.parentElement;
+                    const hasNext = group && Array.from(group.querySelectorAll('button, a, [role="button"]'))
+                        .some(el => visible(el) && /^(?:next(?:\s+(?:lesson|task|block|exercise|challenge|step))?|continue)$/i.test((el.innerText || el.getAttribute('aria-label') || '').trim()));
+                    if (state && hasNext) announcements.push('Current task completed.');
+                }
+                // Read the whole visible test list, including accessible icon labels.
+                // A green color alone is not completion evidence.
+                const suites = document.querySelectorAll('.test-results, #tests, [class*="testResults" i], [aria-label*="test results" i], [class*="test-suite" i]');
+                for (const suite of suites) {
+                    if (!visible(suite) || suite.closest('[class*="history" i]')) continue;
+                    const rows = Array.from(suite.querySelectorAll('li, [role="listitem"], tr, [class*="testcase" i], [class*="test-case" i]'))
+                        .filter(visible).filter(row => !Array.from(row.querySelectorAll('li, [role="listitem"], tr, [class*="testcase" i], [class*="test-case" i]')).some(visible));
+                    if (!rows.length) continue;
+                    let passed = 0, failed = 0;
+                    for (const row of rows) {
+                        const labels = [row.getAttribute('aria-label') || '', row.innerText || '', ...Array.from(row.querySelectorAll('[aria-label], [title], .sr-only')).map(el => el.getAttribute('aria-label') || el.getAttribute('title') || el.textContent || '')].join(' ');
+                        if (/\b(failed|failing|not passed)\b/i.test(labels)) failed++;
+                        else if (/\b(passed|passing)\b/i.test(labels)) passed++;
+                    }
+                    if (passed + failed === rows.length) return `${passed} passed, ${failed} failed`;
+                }
                 // 1. Dedicated test results containers / alerts / modals
                 const dedicatedSelectors = [
                     '[data-cy="submission-result"]', '.submission-result', '.test-results',
-                    '.result-container', '[class*="testResults" i]', '[class*="submissionResults" i]',
+                    '.result-container', '[role="status"]', '[class*="testResults" i]', '[class*="submissionResults" i]',
                     '[class*="submission-result" i]', '[class*="submission-status" i]',
                     '.mantine-Alert-root', '[role="alert"]',
                     '.mantine-Notification-root', '[class*="notification" i]',
@@ -156,8 +243,8 @@ class GenericAdapter(PlatformAdapter):
                     const el = Array.from(document.querySelectorAll(sel)).find(visible);
                     if (el && (el.innerText || '').trim().length > 3) {
                         const txt = (el.innerText || '').trim();
-                        if (/passed|failed|accepted|wrong|error|test\s*case|score|verdict/i.test(txt)) {
-                            return txt;
+                        if (/passed|failed|accepted|wrong|error|test\s*case|score|verdict|(?:lesson|challenge|exercise|task)\s+(?:is\s+)?complet(?:e|ed)/i.test(txt)) {
+                            return [txt, ...announcements].join('\n');
                         }
                     }
                 }
@@ -172,7 +259,7 @@ class GenericAdapter(PlatformAdapter):
                     }
                     const pTxt = (panel.innerText || '').trim();
                     if (pTxt.length > 5 && /passed|failed|accepted|wrong|error|test\s*case|score|runtime/i.test(pTxt)) {
-                        return pTxt;
+                        return [pTxt, ...announcements].join('\n');
                     }
                 }
 
@@ -181,13 +268,13 @@ class GenericAdapter(PlatformAdapter):
                 for (const sel of outputSelectors) {
                     const el = Array.from(document.querySelectorAll(sel)).find(visible);
                     if (el && (el.innerText || '').trim().length > 3) {
-                        return (el.innerText || '').trim();
+                        return [(el.innerText || '').trim(), ...announcements].join('\n');
                     }
                 }
 
                 // The problem statement, history tables, and overlay logs can all
                 // contain "Accepted". They are not the current submission result.
-                return '';
+                return announcements.join('\n');
             }""")
             text = str(res) if res is not None else ""
             record = parse_test_results(text)
@@ -293,6 +380,7 @@ async def wait_for_terminal(
     timeout: float = 30.0,
     poll_interval: float = 1.0,
     baseline: Optional[SubmissionRecord] = None,
+    on_pending=None,
 ) -> SubmissionRecord:
     """Wait within one deadline, including browser reads; never reparse after it."""
     record = SubmissionRecord(terminal=False, outcome="unknown")
@@ -310,6 +398,8 @@ async def wait_for_terminal(
             record = await adapter.parse_result(page)
             if not record.terminal:
                 observed_pending = True
+                if on_pending is not None:
+                    on_pending()
             if record.terminal and (
                 record.outcome in ("accepted", "wrong_answer", "time_limit_exceeded", "runtime_error", "compilation_error")
                 or record.passed_count is not None

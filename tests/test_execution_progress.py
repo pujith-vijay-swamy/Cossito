@@ -2,11 +2,41 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
-from models import CodingTask
+from models import CodingTask, SubmissionRecord
 from task_subagent import TaskSubagent
 
 
 class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resume_checks_existing_pass_without_launching_writer(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        adapter = SimpleNamespace(parse_result=AsyncMock(return_value=SubmissionRecord(
+            terminal=True, outcome='accepted', passed_count=3, total_count=3, failed_count=0)))
+        with patch('task_subagent.detect_platform', new=AsyncMock(return_value=adapter)), patch('task_subagent.Agent') as factory:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertTrue(result.success)
+        factory.assert_not_called()
+        self.orch._extract_problem_from_dom_direct.assert_not_awaited()
+
+    async def test_resume_preserves_unresolved_submission_without_launching_writer(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        adapter = SimpleNamespace(parse_result=AsyncMock(return_value=SubmissionRecord(terminal=False)))
+        with patch('task_subagent.detect_platform', new=AsyncMock(return_value=adapter)), patch('task_subagent.Agent') as factory:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertFalse(result.success)
+        factory.assert_not_called()
+        self.orch._extract_problem_from_dom_direct.assert_not_awaited()
+
+    async def test_resume_does_not_accept_unchanged_old_pass(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        old = SubmissionRecord(terminal=True, outcome='accepted', raw_output='All tests passed')
+        self.orch._submission_baseline = old
+        adapter = SimpleNamespace(parse_result=AsyncMock(return_value=old.model_copy()))
+        with patch('task_subagent.detect_platform', new=AsyncMock(return_value=adapter)), patch('task_subagent.Agent') as factory:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertFalse(result.success)
+        self.assertEqual(len(self.task.submissions), 1)
+        factory.assert_not_called()
+
     def setUp(self):
         self.task = CodingTask()
         self.task.description = 'Old task description that must be replaced before planning.'
@@ -51,6 +81,24 @@ class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
         with patch('task_subagent.Agent', return_value=agent):
             result = await TaskSubagent(self.task, self.orch).execute()
         self.assertIn('without writing code', result.output_message)
+
+    async def test_final_explanation_is_preserved_when_no_code_is_written(self):
+        history = SimpleNamespace(errors=Mock(return_value=[]),
+                                  final_result=Mock(return_value='The editor is read-only'))
+        agent = SimpleNamespace(run=AsyncMock(return_value=history))
+        with patch('task_subagent.Agent', return_value=agent):
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertFalse(result.success)
+        self.assertIn('The editor is read-only', result.output_message)
+
+    async def test_last_step_error_is_preserved_when_history_has_no_errors(self):
+        history = SimpleNamespace(errors=Mock(return_value=[]))
+        agent = SimpleNamespace(run=AsyncMock(return_value=history),
+                                state=SimpleNamespace(last_result=[SimpleNamespace(error='Model request timed out')]))
+        with patch('task_subagent.Agent', return_value=agent):
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertFalse(result.success)
+        self.assertEqual(result.output_message, 'Model request timed out')
 
     async def test_written_code_and_model_done_do_not_replace_submission_verification(self):
         history = SimpleNamespace(errors=Mock(return_value=[]), has_errors=Mock(return_value=False),

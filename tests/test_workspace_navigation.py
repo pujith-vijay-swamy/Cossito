@@ -51,6 +51,23 @@ class TestWorkspaceNavigation(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(await self.orch._restore_workspace_if_needed(page))
         page.goto.assert_not_awaited()
 
+    async def test_canonical_startup_destination_is_not_restored_to_input_url(self):
+        self.orch.url = 'http://example.test/course'
+        self.orch._workspace_url = 'https://www.example.test/course'
+        page = self.page(self.orch._workspace_url)
+        for _ in range(3):
+            self.assertFalse(await self.orch._restore_workspace_if_needed(page))
+        page.goto.assert_not_awaited()
+        self.assertFalse(self.orch._is_workspace_url('https://external.test/course'))
+
+    async def test_failed_restore_does_not_repeat_navigation(self):
+        page = self.page('https://external.test/')
+        page.goto = AsyncMock()
+        for _ in range(3):
+            with self.assertRaises(RuntimeError):
+                await self.orch._restore_workspace_if_needed(page)
+        page.goto.assert_awaited_once()
+
     async def test_different_local_port_is_not_the_workspace(self):
         self.assertFalse(self.orch._is_workspace_url('http://localhost:4000/course'))
         self.assertFalse(self.orch._is_workspace_url('https://localhost:3000/course'))

@@ -98,39 +98,60 @@ class BrowserManager:
             self._browser = self._build_browser()
         return self._browser
 
-    async def open_target_page(self, url: str):
-        """Open the initial target once; fail before recon if startup/navigation fails."""
+    async def open_target_page(self, url: str, timeout: float = 45.0):
+        """Navigate once and follow document commit/active-target replacement."""
+        last_url = ''
+
+        def identity(value):
+            parts = urlsplit(value)
+            return (parts.scheme.lower(), parts.hostname, parts.port or
+                    (443 if parts.scheme == 'https' else 80),
+                    parts.path or '/', parts.query, parts.fragment)
+
         async def open_page():
+            nonlocal last_url
             browser = await self.get_browser()
-            if not getattr(browser, "is_cdp_connected", False):
+            if not getattr(browser, 'is_cdp_connected', False):
                 await browser.start()
             page = await browser.get_current_page()
+            original_url = await page.get_url() if page is not None else ''
+            if page is not None and identity(original_url) == identity(url):
+                return page
             if page is None:
                 await browser.navigate_to(url)
-                page = await browser.get_current_page()
             else:
-                current = await page.get_url()
-                def identity(value):
-                    parts = urlsplit(value)
-                    return (parts.scheme.lower(), parts.hostname, parts.port or
-                            (443 if parts.scheme == "https" else 80),
-                            parts.path or "/", parts.query, parts.fragment)
-                if identity(current) != identity(url):
-                    await page.goto(url)
-                    # CDP Page.navigate returns before the new document commits.
-                    # Wait for the URL to change instead of inspecting about:blank.
-                    while await page.get_url() == current:
-                        await asyncio.sleep(0.1)
-            if page is None:
-                raise RuntimeError("Navigation failed: no active target page")
-            actual = await page.get_url()
-            if not actual or actual.startswith(("about:", "chrome:", "chrome-error:", "edge:")):
-                raise RuntimeError("Navigation failed: target page did not open")
-            return page
+                await page.goto(url)
+
+            # A navigation command completing is not a document commit. Both
+            # branches can still expose blank/internal pages, or replace the
+            # target object entirely. Never send another navigation while waiting.
+            while True:
+                active = await browser.get_current_page()
+                candidates = [page] if page is not None else []
+                if active is not None and active is not page:
+                    candidates.append(active)
+                for candidate in candidates:
+                    try:
+                        actual = await candidate.get_url()
+                    except Exception:
+                        # A detached old page is expected when the target changes.
+                        continue
+                    last_url = actual or ''
+                    parts = urlsplit(last_url)
+                    if parts.scheme in ('chrome-error', 'edge-error'):
+                        raise RuntimeError('Navigation failed: the browser displayed a network error page')
+                    if parts.scheme not in ('http', 'https') or not parts.hostname:
+                        continue
+                    if identity(actual) == identity(original_url):
+                        continue
+                    return candidate
+                await asyncio.sleep(0.1)
+
         try:
-            return await asyncio.wait_for(open_page(), timeout=45.0)
+            return await asyncio.wait_for(open_page(), timeout=timeout)
         except asyncio.TimeoutError as exc:
-            raise RuntimeError("Navigation failed: browser startup or target page timed out") from exc
+            state = urlsplit(last_url).scheme or 'no active page'
+            raise RuntimeError(f'Navigation failed: target document did not become available within {timeout:g}s (last state: {state})') from exc
 
     async def close(self) -> None:
         """Gracefully close the browser if it's open."""

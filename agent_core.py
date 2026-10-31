@@ -564,6 +564,16 @@ class AgentOrchestrator:
             # ---- Solve the task ----
             await self._execute_single_task(task, total_tasks=total)
 
+            if task.status == TaskStatus.SUCCESS and task.state == TaskState.PASSED and not self._stop_requested:
+                from platform_adapters import finish_verified_completion
+                browser = await self.browser_mgr.get_browser()
+                page = await self._get_current_page_safe(browser)
+                if page is not None:
+                    has_next = any(t.status != TaskStatus.SUCCESS and t.state != TaskState.SKIPPED for t in tq.tasks[idx + 1:])
+                    actions = await finish_verified_completion(page, verified=True, advance=has_next)
+                    if actions:
+                        self._log('Completion workflow: ' + ' → '.join(actions), 'success')
+
             # ---- Check for graceful Pause Request ----
             if not hasattr(self, "control_flags") or self.control_flags is None:
                 self.control_flags = {"stop_requested": False, "suggestions": []}
@@ -651,7 +661,23 @@ class AgentOrchestrator:
 
             # Re-read after task selection even if the cached recon description
             # was long enough: it may have been captured during hydration.
-            fresh_text, _, _ = await self._extract_problem_from_dom_direct(page)
+            fresh_text, observed_tasks, _ = await self._extract_problem_from_dom_direct(page)
+            # Completion can change while the queue is running (for example,
+            # when a user completes a lesson). Reconcile by observed identity,
+            # never by a repeated display label such as "Part 001".
+            completed_keys = {
+                q.get('identity') or q.get('url') or q.get('href')
+                for q in (observed_tasks or []) if q.get('completed')
+            } - {None, ''}
+            queue = getattr(self.state, 'task_queue', None)
+            for queued in (queue.tasks if queue else [task]):
+                if queued.platform_task.key in completed_keys:
+                    queued.status = TaskStatus.SUCCESS
+                    queued.state = TaskState.PASSED
+            if task.status == TaskStatus.SUCCESS and task.state == TaskState.PASSED:
+                self._log(f'⏩ {task_label} is already completed on the platform; preserving its code.', 'info')
+                self._notify()
+                return
             fresh_text = clean_extracted_problem_text(fresh_text)
             if fresh_text and not is_navigation_or_overview_text(fresh_text):
                 task.description = fresh_text

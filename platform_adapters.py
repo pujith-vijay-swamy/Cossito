@@ -21,6 +21,47 @@ from verification import parse_test_results
 logger = logging.getLogger(__name__)
 
 
+POST_COMPLETION_SCRIPT = r"""(args) => {
+    const visible = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"], [inert]');
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"]')).filter(visible);
+    const root = dialogs.at(-1) || document;
+    const controls = Array.from(root.querySelectorAll('button, [role="button"], a')).filter(el => visible(el) && !el.disabled && el.getAttribute('aria-disabled') !== 'true');
+    const label = el => (el.getAttribute('aria-label') || el.innerText || '').trim().replace(/\s+/g, ' ');
+    const mark = controls.filter(el => /^(?:mark\s+(?:(?:this|the)\s+(?:lesson|task|block|exercise)\s+)?(?:as\s+)?completed?|complete\s+(?:(?:this|the)\s+)?(?:lesson|task|block|exercise))$/i.test(label(el)));
+    if (!args.marked && mark.length === 1) { mark[0].click(); return 'marked'; }
+    if (mark.length) return 'waiting';
+    const next = controls.filter(el => /^(?:next\s+(?:lesson|task|exercise|challenge|step)|(?:go|proceed)\s+to\s+(?:the\s+)?next\s+(?:lesson|task|exercise|challenge|step))$/i.test(label(el)));
+    if (args.advance && next.length === 1) { next[0].click(); return 'advanced'; }
+    if (!args.advance && dialogs.length && !mark.length) {
+        const close = controls.filter(el => /^(?:close|cancel)$/i.test(label(el)));
+        if (close.length) { close[0].click(); return 'closed'; }
+    }
+    return dialogs.length || mark.length ? 'waiting' : 'idle';
+}"""
+
+
+async def finish_verified_completion(page: Any, *, verified: bool, advance: bool) -> list[str]:
+    """Finalize a verified task; click each completion/navigation action once."""
+    if not verified:
+        return []
+    from dom_extraction import parse_eval_result
+    actions = []
+    async def finish():
+        for _ in range(12):
+            raw = await page.evaluate(POST_COMPLETION_SCRIPT, {'marked': 'marked' in actions, 'advance': advance})
+            action = parse_eval_result(raw)
+            if action in ('marked', 'advanced', 'closed'):
+                actions.append(action)
+            if action in ('advanced', 'closed') or (action == 'idle' and not actions):
+                break
+            await asyncio.sleep(0.25)
+    try:
+        await asyncio.wait_for(finish(), timeout=6.0)
+    except asyncio.TimeoutError:
+        pass
+    return actions
+
+
 COMPLETION_CONTROL_SCRIPT = r"""(requestedLabel) => {
     const visible = el => el.getClientRects().length && getComputedStyle(el).visibility !== 'hidden' && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"]');
     const controls = Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"], input[type="button"], a'))

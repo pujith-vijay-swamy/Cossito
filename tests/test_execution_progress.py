@@ -159,3 +159,23 @@ class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
         orch.hitl.trigger_pause.assert_awaited_once()
         self.assertEqual(self.task.budgets.code_repairs, before)
         self.assertIn('Model request timed out', orch.state.hitl_reason)
+
+    async def test_newly_completed_platform_task_does_not_launch_writer(self):
+        from agent_core import AgentOrchestrator
+        from models import TaskState, TaskStatus
+        orch = AgentOrchestrator(url='https://example.test/task', api_key='test', headless=True)
+        orch._notify = Mock()
+        orch._log = Mock()
+        orch._navigate_to_task_question = AsyncMock()
+        self.task.platform_task.key = 'https://example.test/task'
+        page = SimpleNamespace(get_url=AsyncMock(return_value=orch.url), evaluate=AsyncMock(return_value=[]))
+        orch.browser_mgr.get_browser = AsyncMock(return_value=object())
+        orch._get_current_page_safe = AsyncMock(return_value=page)
+        orch._extract_problem_from_dom_direct = AsyncMock(return_value=(self.statement, [
+            {'identity': self.task.platform_task.key, 'completed': True}], []))
+        orch._solve_and_verify = AsyncMock()
+        with patch('agent_core.wait_for_page_ready', new=AsyncMock()):
+            await orch._execute_single_task(self.task)
+        orch._solve_and_verify.assert_not_awaited()
+        self.assertEqual(self.task.status, TaskStatus.SUCCESS)
+        self.assertEqual(self.task.state, TaskState.PASSED)

@@ -97,7 +97,7 @@ class ReconEngine:
         unique: dict[tuple[str, str], dict] = {}
         for candidate in candidates:
             title = " ".join((candidate.get("text") or "").split()).casefold()
-            destination = candidate.get("url") or candidate.get("href") or ""
+            destination = candidate.get("identity") or candidate.get("url") or candidate.get("href") or candidate.get("selector") or ""
             identity = (str(destination).strip(), title if not destination else "")
             if not any(identity):
                 continue
@@ -133,9 +133,12 @@ class ReconEngine:
 
         for i, q in enumerate(candidates):
             q_text = q.get("text", f"Question {i+1}")
-            if len(candidates) == 1 and _is_section_header_text(q_text):
+            if len(candidates) == 1 and not q.get("is_leaf") and _is_section_header_text(q_text):
                 q_text = extract_problem_title_from_text(valid_desc) or "Question 1"
-            t = CodingTask(queue_index=i, platform_task=PlatformTask(key=str(i + 1), title=q_text))
+            t = CodingTask(queue_index=i, platform_task=PlatformTask(key=str(i + 1), title=q_text, url=q.get("url") or q.get("href") or ""))
+            if q.get('identity'):
+                t.platform_task.key = q['identity']
+            t.target_selector = q.get("selector") or ""
             if i == active_idx and valid_desc:
                 t.description = f"{q_text}. {valid_desc}"
                 t.visual_design_spec = initial_design
@@ -168,7 +171,7 @@ class ReconEngine:
                     pass
 
             detected = section_questions or getattr(self._orch, "_detected_section_questions", [])
-            real_qs = [q for q in detected if not _is_section_header_text(q.get("text", ""))]
+            real_qs = [q for q in detected if q.get("is_leaf") or not _is_section_header_text(q.get("text", ""))]
             candidates = real_qs if real_qs else detected
 
             if len(candidates) > 1:
@@ -243,18 +246,18 @@ class ReconEngine:
 
                     extracted_text = clean_extracted_problem_text(extracted_text)
 
-                    real_qs = [q for q in section_questions if not _is_section_header_text(q.get("text", ""))]
+                    real_qs = [q for q in section_questions if q.get("is_leaf") or not _is_section_header_text(q.get("text", ""))]
                     if (real_qs and len(extracted_text) >= 50) or (real_qs and "?active=" not in current_url) or (not real_qs and len(extracted_text) >= 50):
                         break
                     await asyncio.sleep(0.8)
 
-                real_candidates = [q for q in section_questions if not _is_section_header_text(q.get("text", ""))]
+                real_candidates = [q for q in section_questions if q.get("is_leaf") or not _is_section_header_text(q.get("text", ""))]
                 candidates = real_candidates if real_candidates else section_questions
                 pending_detected = [q for q in candidates if not q.get("completed")]
 
                 # If only 1 candidate was found and its title is a section header, or 0 candidates, expand it and re-scan
                 is_section_header = (
-                    len(candidates) == 1 and _is_section_header_text(candidates[0].get("text", ""))
+                    len(candidates) == 1 and not candidates[0].get("is_leaf") and _is_section_header_text(candidates[0].get("text", ""))
                 )
                 if is_section_header or len(candidates) == 0:
                     header_txt = candidates[0].get("text", "") if candidates else ""
@@ -291,7 +294,7 @@ class ReconEngine:
                             if new_section_questions:
                                 section_questions = new_section_questions
                                 self._orch._detected_section_questions = section_questions
-                                new_real = [q for q in section_questions if not _is_section_header_text(q.get("text", ""))]
+                                new_real = [q for q in section_questions if q.get("is_leaf") or not _is_section_header_text(q.get("text", ""))]
                                 candidates = new_real if new_real else section_questions
                                 pending_detected = [q for q in candidates if not q.get("completed")]
                     except Exception:
@@ -573,7 +576,7 @@ class ReconEngine:
 
         # Check if DOM scanner detected questions in a section sidebar
         detected = getattr(self._orch, "_detected_section_questions", [])
-        real_qs = [q for q in detected if not _is_section_header_text(q.get("text", ""))]
+        real_qs = [q for q in detected if q.get("is_leaf") or not _is_section_header_text(q.get("text", ""))]
         candidates = real_qs if real_qs else detected
 
         if candidates:
@@ -634,6 +637,24 @@ class ReconEngine:
             (args) => {
                 const taskKey = typeof args === 'object' && args !== null ? args.taskKey : args;
                 const taskTitle = typeof args === 'object' && args !== null && args.taskTitle ? args.taskTitle.toLowerCase().trim() : '';
+                const normalizeScope = value => value.replace(/\b\d+(?:\.\d+)?\s*%/g, '').trim().replace(/\s+/g, ' ');
+                let expectedScope = null;
+                try { const key = JSON.parse(taskKey); if (Array.isArray(key)) expectedScope = normalizeScope(key[0]); } catch (_) {}
+
+                // SPA sidebars may unmount lessons when their section closes.
+                // Expand the observed section before trying stale leaf locators.
+                if (expectedScope) {
+                    const sections = expectedScope.split(' / ');
+                    for (const control of document.querySelectorAll('[aria-expanded="false"], summary')) {
+                        if (control.closest('#__omnitasker_panel')) continue;
+                        if (control.matches('summary') && control.parentElement.open) continue;
+                        const label = normalizeScope(control.innerText || control.textContent || '');
+                        if (sections.includes(label)) {
+                            control.click();
+                            return 'Expanded task section';
+                        }
+                    }
+                }
 
                 function expandParents(el) {
                     try {
@@ -686,17 +707,52 @@ class ReconEngine:
                     '[class*="question-item"]', '[class*="problem-item"]',
                     '[role="tab"]', '.question-tab', 'button', 'a'
                 ];
-                const allLinks = Array.from(document.querySelectorAll(candidateSelectors.join(',')));
+                const allLinks = Array.from(new Set(Array.from(document.querySelectorAll(candidateSelectors.join(','))).map(el => el.closest('a[href]') || el)));
 
                 function selectQuestion(el) {
                     const target = el.matches('a, button, [role="tab"]') ? el : (el.querySelector('a, button') || el);
                     if ([el, target].some(node => node.getAttribute('aria-selected') === 'true' ||
                         (node.hasAttribute('aria-current') && node.getAttribute('aria-current') !== 'false') ||
-                        node.getAttribute('data-active') === 'true')) return 'Already selected';
+                        node.getAttribute('data-active') === 'true') || target.querySelector('[data-active="true"], [aria-current="page"], [aria-selected="true"]')) return 'Already selected';
                     expandParents(target);
                     // One native click preserves SPA routing and avoids double navigation.
                     target.click();
                     return 'Clicked';
+                }
+
+                // Prefer observed identity: numbered labels repeat across chapters.
+                if (args.taskUrl) {
+                    if (new URL(args.taskUrl, document.baseURI).href === window.location.href) return 'Already selected by destination';
+                    const match = allLinks.find(el => {
+                        const link = el.matches('a[href]') ? el : el.querySelector('a[href]');
+                        return link && new URL(link.getAttribute('href'), document.baseURI).href === new URL(args.taskUrl, document.baseURI).href;
+                    });
+                    if (match) return selectQuestion(match) + ' question by destination';
+                    return null;
+                }
+                if (args.taskSelector) {
+                    const match = document.querySelector(args.taskSelector);
+                    const labelOf = el => { const node = el.querySelector('.mantine-NavLink-label, [class*="label"]') || el; return (node.innerText || node.textContent || '').trim().replace(/\s+/g, ' ').toLowerCase(); };
+                    const scopeOf = el => {
+                        const labels = [];
+                        for (let parent = el.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+                            const label = document.getElementById(parent.getAttribute('aria-labelledby') || '');
+                            const previous = parent.previousElementSibling;
+                            const heading = label || (previous && previous.matches('[aria-expanded], summary, h1, h2, h3, h4') ? previous : null);
+                            if (heading) {
+                                const text = normalizeScope(heading.innerText || heading.textContent || '');
+                                if (text && text.length < 120 && !labels.includes(text)) labels.unshift(text);
+                            }
+                        }
+                        return labels.join(' / ');
+                    };
+                    const matches = el => labelOf(el) === taskTitle && (expectedScope === null || scopeOf(el) === expectedScope);
+                    if (match && matches(match) && match.getClientRects().length && !match.closest('[hidden], [aria-hidden="true"]')) return selectQuestion(match) + ' question by observed selector';
+                    const alternatives = allLinks.filter(el => el.matches('a, button, [role="tab"], [role="link"]') && matches(el));
+                    const visible = alternatives.filter(el => el.getClientRects().length && !el.closest('[hidden], [aria-hidden="true"]') && getComputedStyle(el).visibility !== 'hidden');
+                    if (visible.length === 1) return selectQuestion(visible[0]) + ' question by identity';
+                    if (alternatives.length === 1) return selectQuestion(alternatives[0]) + ' question by identity';
+                    return null;
                 }
 
                 // 1. Support matching by task.platform_task.title (e.g. Mantine NavLinks on coding platforms)
@@ -754,14 +810,42 @@ class ReconEngine:
                 return null;
             }
             """
-            nav_result = await page.evaluate(nav_script, {"taskKey": task_key, "taskTitle": task_title})
+            nav_result = None
+            for attempt in range(4):
+                nav_result = await page.evaluate(nav_script, {"taskKey": task_key, "taskTitle": task_title, "taskUrl": task.platform_task.url, "taskSelector": task.target_selector})
+                if nav_result and nav_result != 'Expanded task section':
+                    break
+                if not nav_result and attempt == 0:
+                    # Rediscover mounted controls once; do not reuse an obsolete
+                    # nth-child selector or guess from a duplicated lesson title.
+                    _, candidates, _ = await self._orch._extract_problem_from_dom_direct(page)
+                    def normalize_identity(value):
+                        def clean(text):
+                            return re.sub(r'\s+', ' ', re.sub(r'\b\d+(?:\.\d+)?\s*%', '', str(text or ''))).strip()
+                        try:
+                            parts = json.loads(value)
+                            if isinstance(parts, list):
+                                return json.dumps([clean(part) for part in parts])
+                        except (TypeError, ValueError):
+                            pass
+                        return clean(value)
+                    matches = [q for q in (candidates or []) if normalize_identity(q.get('identity') or q.get('url')) == normalize_identity(task_key)]
+                    if len(matches) == 1:
+                        task.target_selector = matches[0].get('selector') or task.target_selector
+                        task.platform_task.url = matches[0].get('url') or task.platform_task.url
+                if attempt < 3:
+                    await asyncio.sleep(0.3)
+            if nav_result == 'Expanded task section':
+                nav_result = None
 
+            if not nav_result:
+                raise RuntimeError(f'Could not uniquely select task {task_title}; refusing to write code on the previous task.')
             if nav_result:
                 self._orch._log(f"🧭 Auto-navigated browser to {task.platform_task.title or f'Task #{task.queue_index + 1}'}: {nav_result}", "info")
                 if not str(nav_result).startswith("Already selected"):
                     await asyncio.sleep(0.5)  # Yield for the SPA to apply the selection
         except Exception as e:
-            print(f"Auto-navigation helper note: {e}")
+            raise RuntimeError(f'Task selection failed: {e}') from e
 
     defensively_recover_dom_tq = _defensively_recover_dom_tq
     run_recon = _run_recon

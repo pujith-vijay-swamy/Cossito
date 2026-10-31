@@ -17,6 +17,21 @@ from recon_engine import ReconEngine
 
 
 class TestReconAndDom(unittest.TestCase):
+    def test_numbered_leaf_tasks_keep_their_labels_and_destinations(self):
+        orch = MagicMock()
+        orch._detected_section_questions = [
+            {'text': 'Part 001', 'url': 'https://example.test/a/1', 'is_leaf': True},
+            {'text': 'Part 001', 'url': 'https://example.test/b/1', 'is_leaf': True},
+            {'text': 'Lesson 2', 'selector': '#lesson-two', 'is_leaf': True},
+        ]
+        engine = ReconEngine(orch)
+        tasks = engine._build_tasks_from_candidates(orch._detected_section_questions, '')
+        self.assertEqual([t.platform_task.title for t in tasks], ['Part 001', 'Part 001', 'Lesson 2'])
+        self.assertEqual(tasks[1].platform_task.url, 'https://example.test/b/1')
+        self.assertEqual(tasks[2].target_selector, '#lesson-two')
+        single = engine._build_tasks_from_candidates([orch._detected_section_questions[0]], '')
+        self.assertEqual(single[0].platform_task.title, 'Part 001')
+
 
     def test_observed_single_question_overrides_multiple_model_tasks(self):
         orch = MagicMock()

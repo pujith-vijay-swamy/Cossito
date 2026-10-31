@@ -665,7 +665,7 @@ async def extract_problem_from_dom(
                                             /(\d+\s*problems?|\d+\s*questions?|\d+\s*tasks?|\d+\s*items?)/i.test(txt);
 
                     // Only consider expandable containers, not leaf question items
-                    const isExpandable = isAccordionControl || hasChevron || (hasAriaExpanded && acc.getAttribute('aria-expanded') !== null) || hasPanelSibling || isCategoryTitle;
+                    const isExpandable = isAccordionControl || (hasChevron && !acc.matches('a[href]')) || hasAriaExpanded || hasPanelSibling;
                     if (!isExpandable) continue;
 
                     let isExpanded = false;
@@ -740,6 +740,9 @@ async def extract_problem_from_dom(
                 '.question-tab', 'li.question',
                 '.sidebar-item', '[data-cy*="question"]'
             ];
+            // Include generic curriculum controls even when a named selector
+            // already found some tasks elsewhere on the page.
+            selectors.push('aside a[href]', 'aside button', '[data-sidebar="sidebar"] a[href]', '[data-sidebar="sidebar"] button', 'nav a[href]', 'nav button');
             let candidateElems = Array.from(document.querySelectorAll(selectors.join(',')));
             if (candidateElems.length === 0) {
                 // Generic fallback must represent navigation controls. Static
@@ -748,7 +751,7 @@ async def extract_problem_from_dom(
                 candidateElems = Array.from(document.querySelectorAll('a[href], button, [role="tab"], [role="link"]'));
             }
             const qList = [];
-            const seen = new Set();
+            const seen = new Map();
             const activeTitleLower = (activeProblemTitle || '').toLowerCase().trim();
             const navKeywords = /^(question|task|problem|assignment|coding|practice|challenge|q\d+|\d+[\.:\)\s]?|[0-9]{1,2}$)/i;
             const nonCodingKeywords = /^(?:intro|introduction|overview|summary|video|reading|lecture|welcome|index|setup|getting\s+started|instructions|home|problems|courses?|submissions?|blogs?|compete|code|my\s+doubts?|application|profile|my\s+bookmarks?|my\s+orders?|my\s+attendance|show\s+qr|theme|account|logout|log\s+out|sign\s+out|login|sign\s+in|previous\s+chapter.*|next\s+chapter.*|back\s+to\s+course|course\s+home|description|editorial|solutions?|hints?|discuss(?:ions?)?|test\s*\d*|run|submit|input|output|expected\s+output|custom\s+input|console)$/i;
@@ -789,6 +792,24 @@ async def extract_problem_from_dom(
                 return false;
             }
 
+            // Wrappers and their nested controls describe the same lesson.
+            candidateElems = Array.from(new Set(candidateElems.map(el =>
+                el.closest('a[href]') || (el.matches('button, [role="tab"], [role="link"]') ? el :
+                (el.querySelector('a[href], button, [role="tab"], [role="link"]') || el)))));
+            function sectionPath(el) {
+                const labels = [];
+                for (let parent = el.parentElement; parent && parent !== document.body; parent = parent.parentElement) {
+                    const labelledBy = parent.getAttribute('aria-labelledby');
+                    const label = labelledBy && document.getElementById(labelledBy);
+                    const previous = parent.previousElementSibling;
+                    const heading = label || (previous && previous.matches('[aria-expanded], summary, h1, h2, h3, h4') ? previous : null);
+                    if (heading) {
+                        const text = (heading.innerText || heading.textContent || '').replace(/\b\d+(?:\.\d+)?\s*%/g, '').trim().replace(/\s+/g, ' ');
+                        if (text && text.length < 120 && !labels.includes(text)) labels.unshift(text);
+                    }
+                }
+                return labels.join(' / ');
+            }
             for (const el of candidateElems) {
                 // Skip site headers, topbars, user profile dropdowns, footers, code editors
                 if (el.closest('header, footer, .mantine-AppShell-header, .mantine-Header-root, [class*="Header" i], [class*="header" i], [class*="Topbar" i], [class*="topbar" i], .mantine-Menu-dropdown, .monaco-editor, .CodeMirror, .ace_editor, #__omnitasker_panel')) {
@@ -813,52 +834,76 @@ async def extract_problem_from_dom(
                 })();
                 const hasChildNavLinks = el.querySelector('.mantine-NavLink-root, button[class*="NavLink"], .mantine-NavLink-children, .mantine-Collapse-root') !== null;
 
-                if (hasChevron || isAccordionControl || hasChildrenSibling || hasChildNavLinks) {
+                if ((hasChevron && !el.matches('a[href]')) || isAccordionControl || hasChildrenSibling || hasChildNavLinks) {
                     continue;
                 }
                 const labelEl = el.querySelector('.mantine-NavLink-label, [class*="label"]') || el;
                 const txt = (labelEl.innerText || el.innerText || '').trim().replace(/\s+/g, ' ');
-                if (!txt || txt.length > 90 || seen.has(txt) || nonCodingKeywords.test(txt)) continue;
+                if (!txt || txt.length > 90 || nonCodingKeywords.test(txt)) continue;
+                const isInsideChildren = el.closest('.mantine-NavLink-children, .mantine-Collapse-root, .mantine-Accordion-panel') !== null;
+                const leafControl = el.matches('a[href], button, [role="link"], [role="tab"]') &&
+                    (isInsideChildren || el.closest('aside, nav, [data-sidebar="sidebar"], [class*="playlist" i]'));
 
                 // Section title check: skip section/category headers unconditionally
-                if (isSectionTitle(txt)) {
+                if (isSectionTitle(txt) && !leafControl) {
                     continue;
                 }
 
                 const href = (el.getAttribute('href') || '') + ' ' + (el.querySelector('a')?.getAttribute('href') || '');
                 const hasQuestionUrl = href.includes('active=') || (href.includes('chapter') && !href.includes('previous') && !href.includes('next')) || href.includes('problem');
-                const isInsideChildren = el.closest('.mantine-NavLink-children, .mantine-Collapse-root, .mantine-Accordion-panel') !== null;
                 const isSidebarChild = el.closest('[class*="sidebar" i], [class*="playlist" i], [class*="question" i], [class*="Navbar" i], .mantine-AppShell-navbar, aside') !== null;
                 const isCurriculumItem = el.closest('.mantine-AppShell-main, main, [role="main"]') !== null && (hasQuestionUrl || navKeywords.test(txt));
 
-                if (navKeywords.test(txt) || hasQuestionUrl || isInsideChildren || (isSidebarChild && txt.length >= 1 && txt.length < 90) || isCurriculumItem) {
-                    seen.add(txt);
+                if (leafControl || navKeywords.test(txt) || hasQuestionUrl || isInsideChildren || (isSidebarChild && txt.length >= 1 && txt.length < 90) || isCurriculumItem) {
+                    const link = el.matches('a[href]') ? el : el.querySelector('a[href]');
+                    const url = link ? link.href : '';
+                    let selector = '';
+                    if (!url) {
+                        const path = [];
+                        let node = el;
+                        while (node && node !== document.body) {
+                            if (node.id) { path.unshift('#' + CSS.escape(node.id)); break; }
+                            const index = Array.from(node.parentElement.children).indexOf(node) + 1;
+                            path.unshift(node.tagName.toLowerCase() + ':nth-child(' + index + ')');
+                            node = node.parentElement;
+                        }
+                        selector = path.join(' > ');
+                    }
+                    const scope = sectionPath(el);
+                    const identity = url || JSON.stringify([scope, txt.toLowerCase()]);
                     const isCompleted = hasGreenCompletionIndicator(el);
                     const txtLower = txt.toLowerCase();
-                    const isActive = el.getAttribute('data-active') === 'true' ||
+                    const isActive = (url && url === window.location.href) || el.getAttribute('data-active') === 'true' ||
+                                     !!el.querySelector('[data-active="true"], [aria-current="page"], [aria-selected="true"]') ||
                                      el.getAttribute('aria-current') === 'page' ||
                                      el.getAttribute('aria-selected') === 'true' ||
                                      el.classList.contains('active') ||
                                      el.classList.contains('mantine-NavLink-active') ||
                                      (activeTitleLower.length >= 3 && txtLower === activeTitleLower);
-                    qList.push({
+                    if (seen.has(identity)) {
+                        const existing = seen.get(identity);
+                        existing.completed ||= isCompleted;
+                        existing.active ||= isActive;
+                        // Prefer a currently rendered copy over a hidden mirror.
+                        if (el.getClientRects().length && selector) existing.selector = selector;
+                        continue;
+                    }
+                    const candidate = {
                         text: txt,
+                        url, selector, scope, identity, is_leaf: true,
                         completed: isCompleted,
                         active: isActive,
                         insideChildPanel: isInsideChildren
-                    });
+                    };
+                    seen.set(identity, candidate);
+                    qList.push(candidate);
                 }
             }
             // If we found leaf questions inside an expanded accordion/child panel (.mantine-NavLink-children / .mantine-Accordion-panel),
             // prefer those leaf questions over unexpanded sibling section items outside the panel
             let finalList = qList;
-            const childPanelItems = qList.filter(q => q.insideChildPanel && !isSectionTitle(q.text));
-            if (childPanelItems.length >= 1) {
-                finalList = childPanelItems;
-            } else if (qList.length > 1) {
-                const filtered = qList.filter(q => !isSectionTitle(q.text));
-                if (filtered.length > 0) finalList = filtered;
-            }
+            // Parent controls were excluded structurally above. Keep all leaf
+            // items, including numbered lessons and leaves in sibling sections.
             const activeIdx = finalList.findIndex(q => q.active);
             if (activeIdx > 0 && !finalList.some(q => q.completed)) {
                 const bodyTxt = document.body ? (document.body.innerText || '') : '';

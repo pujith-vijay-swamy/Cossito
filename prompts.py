@@ -232,12 +232,22 @@ Remaining budgets: code_repairs={{code_repairs}}, submissions={{submissions}}
 
 {{design_section}}
 
+🚨 MULTI-EDITOR MANDATE (HTML / CSS / JAVASCRIPT):
+If the problem workspace has 2 or more code editors (e.g. separate editors or tabs for HTML and CSS):
+- Call `read_code_from_editor` FIRST to inspect the boilerplate of ALL editors on the page!
+- NEVER write CSS code into the HTML editor!
+- NEVER write HTML code into the CSS editor!
+- To update the HTML editor: call `write_code_to_editor(code=..., target_editor="html")`
+- To update the CSS editor: call `write_code_to_editor(code=..., target_editor="css")`
+- When submitting, `submit_code_solution(code=...)` automatically directs CSS code to the CSS editor and HTML code to the HTML editor, or you can specify `target_editor="html"` / `target_editor="css"`.
+
+
 YOUR CURRENT TASK (Task #{{task_id}}):
 {{task_description}}
 
 EXECUTION STEPS (LIGHTNING 2-STEP WORKFLOW):
 1. Locate the target code editor in the already-selected task workspace. The orchestrator has selected this task; do not click Next again or interpret the queue position as a platform question number.
-2. READ THE EDITOR BOILERPLATE FIRST (CRITICAL): Call `read_code_from_editor` to fetch the current contents of the editor. Inspect any existing boilerplate code, required class/method structures, package imports, comments, or template code. You MUST preserve and implement your solution within this template structure!
+2. READ THE EDITOR BOILERPLATE FIRST (CRITICAL): Call `read_code_from_editor` to fetch the current contents of the editor(s). On multi-editor pages (HTML/CSS), this returns the boilerplate of ALL editors and identifies each target_editor. Inspect any existing boilerplate code, required class/method structures, package imports, comments, or template code. You MUST preserve and implement your solution within this template structure!
 3. CALL `submit_code_solution(code=...)`: Call `submit_code_solution` with your complete solution code. This action preserves matching code, chooses an available validation control, and checks completion evidence.
 4. VERIFY SUBMISSION METRICS:
    - If 100% of test cases passed (e.g. 8/8 passed, 0 failed), DO NOT click Submit again! Call `report_task_result(success=True)` and finish with `done`.

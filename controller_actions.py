@@ -709,9 +709,10 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
     @controller.action(
         "Write the complete self-contained code solution into the active code editor on the page. "
-        "Automatically takes a snapshot, verifies editor kind, and confirms write via readback."
+        "Automatically takes a snapshot, verifies editor kind, and confirms write via readback. "
+        "For multi-editor pages (HTML/CSS), pass target_editor with 'html' or 'css' to select the matching editor."
     )
-    async def write_code_to_editor(code: str) -> str:
+    async def write_code_to_editor(code: str, target_editor: Optional[str] = None) -> str:
         # Check for stop request
         if hasattr(orchestrator, "control_flags") and orchestrator.control_flags and orchestrator.control_flags.get("stop_requested"):
             orchestrator._log("🛑 Stop signal detected inside write_code_to_editor. Terminating immediately.", "warn")
@@ -723,7 +724,8 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
         orchestrator._last_report = None
 
         try:
-            orchestrator._log("⚡ Writing complete code solution into editor...")
+            target_desc = f" ({target_editor})" if target_editor else ""
+            orchestrator._log(f"⚡ Writing complete code solution into editor{target_desc}...")
             orchestrator._code_written_in_current_task = True
             
             # Display the code in the Web UI immediately as the current solution code
@@ -749,9 +751,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             for attempt in range(1, 4):
                 orchestrator._log(f"⚡ Editor write attempt {attempt}/3...")
                 try:
-                    success, snap_before, readback = await _get_sym("safe_write", safe_write)(page, code)
+                    success, snap_before, readback = await _get_sym("safe_write", safe_write)(page, code, target=target_editor)
                     if not success:
-                        direct_res = await orchestrator._inject_code_direct(browser, code)
+                        direct_res = await orchestrator._inject_code_direct(browser, code, target=target_editor)
                         if direct_res:
                             success = True
                             snap_before = WorkspaceSnapshot(editor_kind="direct_injected", content=code)
@@ -793,9 +795,10 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
     @controller.action(
         "Write the solution and discover the page's completion workflow: Submit, Check, Run Tests, or automatic validation. "
         "Verify completion without clicking Next prematurely. This also supports pages without a Submit button. "
-        "For a custom validation control, pass completion_control with its exact observed visible label; never invent a label or select navigation."
+        "For a custom validation control, pass completion_control with its exact observed visible label; never invent a label or select navigation. "
+        "For multi-editor pages (HTML/CSS), pass target_editor with 'html' or 'css' if writing to a single editor."
     )
-    async def submit_code_solution(code: str, completion_control: Optional[str] = None) -> str:
+    async def submit_code_solution(code: str, completion_control: Optional[str] = None, target_editor: Optional[str] = None) -> str:
         # Check for stop request
         if hasattr(orchestrator, "control_flags") and orchestrator.control_flags and orchestrator.control_flags.get("stop_requested"):
             orchestrator._log("🛑 Stop signal detected immediately.", "warn")
@@ -823,9 +826,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
 
             # 1. Safe write code
             baseline = await completion_baseline(page, current_task, code)
-            write_success, snap_before, readback = await _get_sym("safe_write", safe_write)(page, code)
+            write_success, snap_before, readback = await _get_sym("safe_write", safe_write)(page, code, target=target_editor)
             if not write_success:
-                direct_res = await orchestrator._inject_code_direct(browser, code)
+                direct_res = await orchestrator._inject_code_direct(browser, code, target=target_editor)
                 if direct_res:
                     write_success = True
                     snap_before = WorkspaceSnapshot(editor_kind="direct_injected", content=code)
@@ -993,6 +996,34 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             
             if page is None:
                 return f"Error: Active page unavailable to read code.{suggestions_block}"
+
+            # Check if there are multiple editors on the page
+            try:
+                from editor_adapters import get_all_editors_summary
+                all_editors = await get_all_editors_summary(page)
+                if len(all_editors) > 1:
+                    orchestrator._log(f"🔍 Multi-editor page detected: {len(all_editors)} editors found.", "info")
+                    sections = [f"Found {len(all_editors)} code editors on this page:\n"]
+                    for ed in all_editors:
+                        lang = ed.get("language") or "text"
+                        label = ed.get("label") or f"Editor #{ed.get('index', 0) + 1}"
+                        target_key = ed.get("target_key") or lang
+                        content_str = ed.get("content") or ""
+                        sections.append(
+                            f"📝 [{label}] (target_editor=\"{target_key}\"):\n"
+                            f"```{lang}\n{content_str}\n```\n"
+                        )
+                    sections.append(
+                        "🚨 MULTI-EDITOR OPERATIONAL MANDATE:\n"
+                        "- NEVER write CSS into the HTML editor or HTML into the CSS editor!\n"
+                        "- To write HTML: call `write_code_to_editor(code=..., target_editor=\"html\")`\n"
+                        "- To write CSS: call `write_code_to_editor(code=..., target_editor=\"css\")`\n"
+                        "- Or submit both with `submit_code_solution(code=...)`."
+                    )
+                    output = "\n".join(sections)
+                    return f"{output}\n\n{suggestions_block}"
+            except Exception as e:
+                orchestrator._log(f"Multi-editor check note: {e}", "info")
             
             # Execute JS to read code from Monaco, CodeMirror, Ace, standard textareas, etc.
             code = await page.evaluate("""() => {

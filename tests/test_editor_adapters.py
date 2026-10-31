@@ -14,6 +14,8 @@ from editor_adapters import (
     TextareaAdapter,
     detect_editor,
     safe_write,
+    classify_code_language,
+    split_multi_editor_code,
 )
 from models import WorkspaceSnapshot
 
@@ -413,6 +415,83 @@ class TestEditorAdapters(unittest.TestCase):
             self.assertFalse(wrote)
             readback = loop.run_until_complete(adapter.readback(page))
             self.assertEqual(readback, "")
+        finally:
+            loop.close()
+
+    def test_classify_code_language(self):
+        css_code = "body {\n  margin: 0;\n  padding: 0;\n  background-color: #f0f0f0;\n  display: flex;\n}"
+        html_code = "<!DOCTYPE html>\n<html>\n<head><title>Test</title></head>\n<body>\n<div class=\"box\">Hello</div>\n</body>\n</html>"
+        html_snippet = "<div class=\"container\">\n  <h1>Header</h1>\n</div>"
+        py_code = "def solve():\n    return 42"
+        self.assertEqual(classify_code_language(css_code), "css")
+        self.assertEqual(classify_code_language(html_code), "html")
+        self.assertEqual(classify_code_language(html_snippet), "html")
+        self.assertEqual(classify_code_language(py_code), "unknown")
+
+    def test_split_multi_editor_code_markdown_blocks(self):
+        combined = (
+            "```html\n<div class=\"card\">Title</div>\n```\n\n"
+            "```css\n.card { color: red; margin: 10px; }\n```"
+        )
+        parts = split_multi_editor_code(combined)
+        self.assertIn("html", parts)
+        self.assertIn("css", parts)
+        self.assertEqual(parts["html"], "<div class=\"card\">Title</div>")
+        self.assertEqual(parts["css"], ".card { color: red; margin: 10px; }")
+
+    def test_split_multi_editor_code_comments(self):
+        combined = (
+            "<!-- HTML -->\n<div class=\"box\"></div>\n\n"
+            "/* CSS */\n.box { background: blue; padding: 5px; }\n"
+        )
+        parts = split_multi_editor_code(combined)
+        self.assertIn("html", parts)
+        self.assertIn("css", parts)
+        self.assertEqual(parts["html"], "<div class=\"box\"></div>")
+        self.assertEqual(parts["css"], ".box { background: blue; padding: 5px; }")
+
+    def test_split_multi_editor_code_embedded_style(self):
+        combined = (
+            "<!DOCTYPE html>\n<html>\n<head>\n"
+            "<style>\nbody { margin: 0; }\n.btn { color: white; }\n</style>\n"
+            "</head>\n<body>\n<button class=\"btn\">Click</button>\n</body>\n</html>"
+        )
+        parts = split_multi_editor_code(combined)
+        self.assertIn("html", parts)
+        self.assertIn("css", parts)
+        self.assertNotIn("<style>", parts["html"])
+        self.assertIn("margin: 0;", parts["css"])
+        self.assertIn("<button class=\"btn\">Click</button>", parts["html"])
+
+    def test_monaco_adapter_target_css_and_html(self):
+        page = MagicMock()
+        written = {}
+
+        async def mock_evaluate(script, *args):
+            self.assertTrue(script.strip().startswith("("))
+            self.assertIn("=>", script)
+            # If target argument passed
+            if len(args) >= 2 and args[1]:
+                target = args[1]
+                code = args[0]
+                written[target] = code
+                return True
+            if "models[0].setValue" in script:
+                written["default"] = args[0] if args else ""
+                return True
+            return True
+
+        page.evaluate = AsyncMock(side_effect=mock_evaluate)
+        adapter = MonacoAdapter()
+        loop = asyncio.new_event_loop()
+        try:
+            wrote_css = loop.run_until_complete(adapter.write(page, ".box { color: red; }", target="css"))
+            self.assertTrue(wrote_css)
+            self.assertEqual(written.get("css"), ".box { color: red; }")
+
+            wrote_html = loop.run_until_complete(adapter.write(page, "<div>Hello</div>", target="html"))
+            self.assertTrue(wrote_html)
+            self.assertEqual(written.get("html"), "<div>Hello</div>")
         finally:
             loop.close()
 

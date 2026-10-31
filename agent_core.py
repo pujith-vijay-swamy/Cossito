@@ -1399,12 +1399,12 @@ class AgentOrchestrator:
         except Exception:
             pass
 
-    async def _inject_code_direct(self, browser, code: str) -> Optional[str]:
+    async def _inject_code_direct(self, browser, code: str, target: Optional[str] = None) -> Optional[str]:
         """Directly inject solution code into Monaco, CodeMirror, Ace, Contenteditable, or Textarea editors on the active page."""
         page = await self._get_current_page_safe(browser)
         if page is None:
             return None
-        injected = await inject_code_to_editor(page, code)
+        injected = await inject_code_to_editor(page, code, target=target)
         if injected:
             self._code_written_in_current_task = True
             self.state.current_solution_code = None

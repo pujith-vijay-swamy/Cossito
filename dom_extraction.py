@@ -933,13 +933,26 @@ async def extract_problem_from_dom(
 _extract_problem_from_dom_direct = extract_problem_from_dom
 
 
-async def inject_code_to_editor(page, code: str) -> Optional[str]:
+async def inject_code_to_editor(page, code: str, target: Optional[str] = None) -> Optional[str]:
     """Directly inject solution code into Monaco, CodeMirror, Ace, Contenteditable, or Textarea editors on the active page."""
     if page is None:
         return None
 
-    js_script = """(code) => {
-        function setEditorCodeRecursively(doc, code) {
+    if target is None:
+        from editor_adapters import split_multi_editor_code, classify_code_language
+        parts = split_multi_editor_code(code)
+        if "html" in parts and "css" in parts:
+            res_h = await inject_code_to_editor(page, parts["html"], target="html")
+            res_c = await inject_code_to_editor(page, parts["css"], target="css")
+            if res_h and res_c:
+                return f"{res_h} & {res_c}"
+            return res_h or res_c
+        classified = classify_code_language(code)
+        if classified in ("html", "css", "javascript"):
+            target = classified
+
+    js_script = """(code, target) => {
+        function setEditorCodeRecursively(doc, code, target) {
             if (!doc) return null;
             const win = doc.defaultView || window;
 
@@ -1159,12 +1172,12 @@ async def inject_code_to_editor(page, code: str) -> Optional[str]:
 
             return null;
         }
-        return setEditorCodeRecursively(document, code);
+        return setEditorCodeRecursively(document, code, target);
     }"""
 
     injected = None
     try:
-        injected = await page.evaluate(js_script, code)
+        injected = await page.evaluate(js_script, code, target or "")
     except Exception as e:
         print(f"JS code injection evaluation note: {e}")
 

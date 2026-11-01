@@ -20,6 +20,7 @@ from browser_use import Agent
 from devtools_perception import DevToolsPerceptionEngine
 from dom_extraction import clean_extracted_problem_text, is_loading_placeholder, is_navigation_or_overview_text
 from editor_adapters import safe_write
+from human_loop import consume_skip_request
 from models import (
     CodingTask,
     SubagentLifecycleState,
@@ -64,21 +65,50 @@ class TaskSubagent:
         if str(task.task_id).replace("task-", "").isdigit():
             task_id_num = int(str(task.task_id).replace("task-", ""))
 
+        if consume_skip_request(orch):
+            return TaskExecutionResult(task_id=str(task.task_id), queue_index=task.queue_index,
+                                       success=False, skipped=True, solution_code=task.solution_code,
+                                       output_message='Skipped by user; existing code and result preserved.')
+
         # A verification timeout is not permission to generate or submit again.
         if task.submissions and not task.submissions[-1].terminal:
             orch._log('Checking the existing test result; preserving the current code.', 'info')
+            reason = 'No fresh final verdict is visible. Run the tests on the current task, then Resume, or send skip this task to continue.'
             try:
                 async def inspect_existing():
                     browser = await orch.browser_mgr.get_browser()
                     page = await orch._get_current_page_safe(browser)
+                    if page is None:
+                        raise RuntimeError('The task page is unavailable; reconnect it or Skip this task.')
+                    expected_url = task.platform_task.url
+                    if expected_url and hasattr(page, 'get_url') and await page.get_url() != expected_url:
+                        raise RuntimeError('The browser is showing a different task. Return to the pending task to verify it, or Skip this task to continue.')
                     adapter = await detect_platform(page)
                     return await adapter.parse_result(page)
-                record = await asyncio.wait_for(inspect_existing(), timeout=10.0)
+                async def inspect_until_terminal():
+                    for observation in range(3):
+                        if getattr(orch, '_stop_requested', False) or orch.control_flags.get('stop_requested'):
+                            raise asyncio.CancelledError('Stopped while checking existing result')
+                        if consume_skip_request(orch):
+                            return None
+                        record = await inspect_existing()
+                        baseline = getattr(orch, '_submission_baseline', None)
+                        fresh = (baseline is None or getattr(orch, '_submission_observed_pending', False)
+                                 or result_fingerprint(record) != result_fingerprint(baseline))
+                        if not record.terminal and re.search(r'\b(?:running|judging|evaluating|compiling|submitting)\b', record.raw_output or '', re.I):
+                            orch._submission_observed_pending = True
+                        if record.terminal and fresh:
+                            return record
+                        if observation < 2:
+                            await asyncio.sleep(.3)
+                    return record
+                record = await asyncio.wait_for(inspect_until_terminal(), timeout=10.0)
+                if record is None:
+                    return TaskExecutionResult(task_id=str(task.task_id), success=False, skipped=True,
+                                               output_message='Skipped by user; existing result preserved.')
                 baseline = getattr(orch, '_submission_baseline', None)
                 fresh = (baseline is None or getattr(orch, '_submission_observed_pending', False)
                          or result_fingerprint(record) != result_fingerprint(baseline))
-                if not record.terminal:
-                    orch._submission_observed_pending = True
                 if record.terminal and fresh:
                     previous = task.submissions[-1]
                     record.task_id = previous.task_id
@@ -89,9 +119,10 @@ class TaskSubagent:
                     return TaskExecutionResult(task_id=str(task.task_id), success=success,
                                                output_message='Existing test result verified.' if success else 'Existing tests report a failure.')
             except Exception as exc:
+                reason = str(exc) or 'The existing result check timed out. Restore the task page or Skip this task.'
                 orch._log(f'Could not read the existing result: {exc}', 'warn')
             return TaskExecutionResult(task_id=str(task.task_id), success=False,
-                                       output_message='The existing result is still unverified. Code and page were preserved.')
+                                       output_message=reason)
 
         orch._task_completed_successfully = False
         orch._code_written_in_current_task = False
@@ -133,22 +164,6 @@ class TaskSubagent:
         if orch.control_flags and orch.control_flags.get("suggestions"):
             suggestions_list = orch.control_flags["suggestions"].copy()
             orch.control_flags["suggestions"].clear()
-
-        # Intercept human skip directives
-        if suggestions_list:
-            skip_keywords = ["skip", "next task", "go to next", "completed", "done", "ignore", "intro"]
-            for sugg in suggestions_list:
-                s_lower = sugg.lower()
-                if any(kw in s_lower for kw in skip_keywords):
-                    orch._log(f"⏭️ Human directive detected ('{sugg}'). Marking Task #{task_id_num} skipped/completed!", "success")
-                    return TaskExecutionResult(
-                        task_id=str(task.task_id),
-                        queue_index=task.queue_index,
-                        success=True,
-                        skipped=True,
-                        solution_code=task.solution_code,
-                        output_message=f"Skipped per human directive: {sugg}",
-                    )
 
         direct_suggestions = ""
         if suggestions_list:
@@ -273,7 +288,7 @@ class TaskSubagent:
                     task_id=str(task.task_id),
                     queue_index=task.queue_index,
                     lifecycle_state=SubagentLifecycleState.IDLE,
-                    success=True,
+                    success=False,
                     skipped=True,
                     solution_code=task.solution_code,
                     output_message="Task skipped by user request",
@@ -289,6 +304,11 @@ class TaskSubagent:
             orch._current_agent_task = None
             orch._current_agent = None
             self._current_agent = None
+
+        if consume_skip_request(orch):
+            return TaskExecutionResult(task_id=str(task.task_id), queue_index=task.queue_index,
+                                       success=False, skipped=True, solution_code=task.solution_code,
+                                       output_message='Task skipped by user request')
 
         # No code was changed: this is an execution/provider failure, not a code
         # repair. Return its real cause before optional browser diagnostics.

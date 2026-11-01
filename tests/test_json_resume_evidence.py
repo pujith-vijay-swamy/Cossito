@@ -83,6 +83,7 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         blank=SimpleNamespace(get_url=AsyncMock(return_value='about:blank'),goto=AsyncMock())
         workspace=SimpleNamespace(target_id='workspace-tab',get_url=AsyncMock(return_value=orch.url),goto=AsyncMock())
         browser=SimpleNamespace(is_cdp_connected=True,get_current_page=AsyncMock(return_value=blank),get_pages=AsyncMock(return_value=[blank,workspace]),get_or_create_cdp_session=AsyncMock())
+        orch.browser_mgr._browser = browser
         page=await orch._get_current_page_safe(browser)
         self.assertIs(page,workspace)
         blank.goto.assert_not_awaited()

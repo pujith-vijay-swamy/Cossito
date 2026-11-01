@@ -31,7 +31,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from agent_core import AgentOrchestrator
-from human_loop import HumanInTheLoopController
+from human_loop import HumanInTheLoopController, is_skip_directive
 from models import AgentPhase, AgentState, TaskStatus
 
 # ---------------------------------------------------------------------------
@@ -766,6 +766,7 @@ def _task_status_icon(status: TaskStatus) -> str:
         TaskStatus.SUCCESS: "✅",
         TaskStatus.FAILED: "❌",
         TaskStatus.RETRYING: "🔁",
+        TaskStatus.SKIPPED: "⏭️",
     }.get(status, "❓")
 
 
@@ -881,6 +882,8 @@ def render_sidebar_controls(api_key, target_url, model_name, provider, custom_ba
             if "suggestions" not in st.session_state.control_flags:
                 st.session_state.control_flags["suggestions"] = []
             st.session_state.control_flags["suggestions"].append(sugg)
+            if is_skip_directive(sugg):
+                st.session_state.hitl_controller.skip()
             # Wiping widget state before rerun inside the callback prevents StreamlitAPIException
             st.session_state.human_suggestion_input = ""
 

@@ -37,6 +37,50 @@ class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.task.submissions), 1)
         factory.assert_not_called()
 
+    async def test_skip_preempts_pending_result_without_browser_or_writer(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        self.orch.control_flags['suggestions'] = ['please skip this problem', 'Keep my formatting']
+        with patch('task_subagent.Agent') as factory:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertTrue(result.skipped)
+        self.assertFalse(result.success)
+        self.orch.browser_mgr.get_browser.assert_not_awaited()
+        factory.assert_not_called()
+        self.assertEqual(self.orch.control_flags['suggestions'], ['Keep my formatting'])
+        self.assertEqual(len(self.task.submissions), 1)
+
+    async def test_resume_observes_delayed_verdict_without_writing(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        adapter = SimpleNamespace(parse_result=AsyncMock(side_effect=[SubmissionRecord(terminal=False, raw_output='Running tests'),
+            SubmissionRecord(terminal=True, outcome='accepted')]))
+        with patch('task_subagent.detect_platform', new=AsyncMock(return_value=adapter)), patch('task_subagent.Agent') as factory:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertTrue(result.success)
+        self.assertEqual(adapter.parse_result.await_count, 2)
+        factory.assert_not_called()
+
+    async def test_resume_does_not_verify_different_task(self):
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        self.task.platform_task.url = 'https://example.test/task/1'
+        self.orch._get_current_page_safe.return_value = SimpleNamespace(get_url=AsyncMock(return_value='https://example.test/task/2'))
+        with patch('task_subagent.detect_platform', new=AsyncMock()) as detect:
+            result = await TaskSubagent(self.task, self.orch).execute()
+        self.assertFalse(result.success)
+        self.assertIn('different task', result.output_message)
+        detect.assert_not_awaited()
+
+    async def test_skipped_result_is_not_recorded_as_passed(self):
+        from agent_core import AgentOrchestrator
+        from models import TaskExecutionResult, TaskState, TaskStatus
+        self.orch.perception_engine = Mock()
+        result = TaskExecutionResult(task_id=self.task.task_id, success=False, skipped=True)
+        with patch('agent_core.TaskSubagent') as factory:
+            factory.return_value.execute = AsyncMock(return_value=result)
+            passed = await AgentOrchestrator._solve_and_verify(self.orch, self.task)
+        self.assertFalse(passed)
+        self.assertEqual(self.task.state, TaskState.SKIPPED)
+        self.assertEqual(self.task.status, TaskStatus.SKIPPED)
+
     def setUp(self):
         self.task = CodingTask()
         self.task.description = 'Old task description that must be replaced before planning.'
@@ -153,7 +197,7 @@ class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
             orch.control_flags['stop_requested'] = True
         orch.hitl.trigger_pause = AsyncMock(side_effect=stop_after_pause)
         before = self.task.budgets.code_repairs
-        with patch('agent_core.wait_for_page_ready', new=AsyncMock()):
+        with patch('agent_core.wait_for_page_ready', new=AsyncMock(return_value=page)):
             await orch._execute_single_task(self.task)
         orch._solve_and_verify.assert_awaited_once()
         orch.hitl.trigger_pause.assert_awaited_once()
@@ -174,8 +218,52 @@ class ExecutionProgressTests(unittest.IsolatedAsyncioTestCase):
         orch._extract_problem_from_dom_direct = AsyncMock(return_value=(self.statement, [
             {'identity': self.task.platform_task.key, 'completed': True}], []))
         orch._solve_and_verify = AsyncMock()
-        with patch('agent_core.wait_for_page_ready', new=AsyncMock()):
+        with patch('agent_core.wait_for_page_ready', new=AsyncMock(return_value=page)):
             await orch._execute_single_task(self.task)
         orch._solve_and_verify.assert_not_awaited()
         self.assertEqual(self.task.status, TaskStatus.SUCCESS)
         self.assertEqual(self.task.state, TaskState.PASSED)
+
+    async def test_skip_after_verification_pause_exits_without_another_attempt(self):
+        from agent_core import AgentOrchestrator
+        from models import TaskState, TaskStatus
+        orch = AgentOrchestrator(url='https://example.test/task', api_key='test', headless=True)
+        orch._notify = Mock()
+        orch._log = Mock()
+        orch._navigate_to_task_question = AsyncMock()
+        page = SimpleNamespace(get_url=AsyncMock(return_value=orch.url), evaluate=AsyncMock(return_value=[]))
+        orch.browser_mgr.get_browser = AsyncMock(return_value=object())
+        orch._get_current_page_safe = AsyncMock(return_value=page)
+        orch._extract_problem_from_dom_direct = AsyncMock(return_value=(self.statement, [], []))
+        self.task.submissions.append(SubmissionRecord(terminal=False))
+        async def pending(*args, **kwargs):
+            orch._execution_blocked_reason = 'No fresh verdict'
+            return False
+        orch._solve_and_verify = AsyncMock(side_effect=pending)
+        async def skip_while_paused(reason):
+            orch.control_flags['suggestions'].append('skip this task')
+            orch.hitl.skip()
+        orch.hitl.trigger_pause = AsyncMock(side_effect=skip_while_paused)
+        before = self.task.budgets.code_repairs
+        with patch('agent_core.wait_for_page_ready', new=AsyncMock(return_value=page)):
+            await orch._execute_single_task(self.task)
+        orch._solve_and_verify.assert_awaited_once()
+        self.assertEqual(self.task.state, TaskState.SKIPPED)
+        self.assertEqual(self.task.status, TaskStatus.SKIPPED)
+        self.assertEqual(self.task.budgets.code_repairs, before)
+        self.assertFalse(orch.hitl.skip_requested)
+        self.assertEqual(orch.control_flags['suggestions'], [])
+
+    async def test_queue_does_not_revisit_skipped_task(self):
+        from agent_core import AgentOrchestrator
+        from models import TaskQueue, TaskState
+        orch = AgentOrchestrator(url='https://example.test/task', api_key='test', headless=True)
+        orch._notify = Mock()
+        orch._log = Mock()
+        orch._hitl_gate = AsyncMock()
+        orch._cleanup_ref_images = Mock()
+        orch._execute_single_task = AsyncMock()
+        skipped = CodingTask(state=TaskState.SKIPPED)
+        next_task = CodingTask()
+        await orch._run_execution_loop(TaskQueue(tasks=[skipped, next_task]))
+        orch._execute_single_task.assert_awaited_once_with(next_task, total_tasks=2)

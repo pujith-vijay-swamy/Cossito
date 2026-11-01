@@ -134,15 +134,25 @@ PAGE_READINESS_SCRIPT = r"""() => {
 }"""
 
 
-async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: float = 0.3) -> None:
+async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: float = 0.3, *, recover_page=None) -> Any:
     """Wait for content, finishing an observed successful completion dialog first."""
     last_reason = 'No readable lesson content was observed.'
     async def poll():
-        nonlocal last_reason
+        nonlocal last_reason, page
+        recovery_attempts = 0
         previous = None
         handled_completion = False
         while True:
-            snapshot = parse_eval_result(await page.evaluate(PAGE_READINESS_SCRIPT))
+            try:
+                snapshot = parse_eval_result(await page.evaluate(PAGE_READINESS_SCRIPT))
+            except ConnectionError as exc:
+                if recover_page is None or recovery_attempts >= 2:
+                    raise ConnectionError('Browser connection was lost. The task has not been rewritten; restore the browser connection before retrying.') from exc
+                recovery_attempts += 1
+                last_reason = 'The browser connection could not be restored.'
+                page = await recover_page(page)
+                previous = None
+                continue
             text = snapshot.get('text', '') if isinstance(snapshot, dict) else ''
             if isinstance(snapshot, dict) and 'dialog' in snapshot:
                 from verification import parse_test_results, is_submission_successful
@@ -162,12 +172,14 @@ async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: f
                            else 'No stable readable lesson content was observed.')
             ready = isinstance(snapshot, dict) and not snapshot.get('busy') and not is_loading_placeholder(text)
             if ready and text == previous:
-                return
+                return page
             previous = text if ready else None
             await asyncio.sleep(poll_interval)
     try:
-        await asyncio.wait_for(poll(), timeout=timeout)
+        return await asyncio.wait_for(poll(), timeout=timeout)
     except asyncio.TimeoutError as exc:
+        if last_reason == 'The browser connection could not be restored.':
+            raise ConnectionError('Browser recovery timed out; the task was not rewritten.') from exc
         raise RuntimeError(f'{last_reason} Page content is still loading or unavailable; refusing to solve a loading screen.') from exc
 
 

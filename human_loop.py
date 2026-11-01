@@ -29,6 +29,32 @@ _AUTH_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
+def is_skip_directive(text: str) -> bool:
+    """Recognize task-navigation requests, not words such as 'done' in coding advice."""
+    text = (text or '').strip().lower()
+    if re.search(r"\b(?:do not|don't|dont|never|not)\s+skip\b", text):
+        return False
+    return bool(re.search(
+        r"^(?:(?:please|can you|could you)\s+)*(?:skip(?:\s+(?:(?:this|the|current|same)\s+)*(?:task|problem|question|lesson|exercise|one|it))?|(?:go|move|proceed)(?:\s+on)?\s+to\s+(?:the\s+)?next(?:\s+(?:task|problem|question|lesson|exercise))?|next\s+(?:task|problem|question|lesson|exercise))\s*[.!]?$",
+        text))
+
+
+def consume_skip_request(orchestrator) -> bool:
+    flags = getattr(orchestrator, 'control_flags', None) or {}
+    suggestions = flags.get('suggestions', [])
+    matching = [s for s in suggestions if is_skip_directive(s)]
+    hitl = getattr(orchestrator, 'hitl', None)
+    requested = bool(matching or getattr(orchestrator, '_user_skip_requested', False)
+                     or (hitl is not None and hitl.skip_requested is True))
+    if requested:
+        for suggestion in matching:
+            suggestions.remove(suggestion)
+        if hitl is not None:
+            hitl.consume_skip()
+        orchestrator._user_skip_requested = False
+    return requested
+
+
 class HumanInTheLoopController:
     """Manages pause/resume signaling between the async agent loop and the UI.
 
@@ -101,9 +127,13 @@ class HumanInTheLoopController:
         visually detects a CAPTCHA or login form that wasn't caught by URL
         pattern matching.
         """
+        if self._skip_requested:
+            return
         self.pause(reason)
         evt = self._ensure_event()
         evt.clear()
+        if self._skip_requested:
+            return
         await evt.wait()
 
     def has_pending_command(self, command: ControlCommand) -> bool:
@@ -155,10 +185,16 @@ class HumanInTheLoopController:
         """
         self.is_paused = False
         self.pause_reason = ""
-        self._skip_requested = False
         self._cancel_requested = False
         self.pending_commands.append(ControlCommand.RESUME)
         self._signal_resume()
+
+    def consume_skip(self) -> bool:
+        requested = self._skip_requested
+        self._skip_requested = False
+        while self.consume_command(ControlCommand.SKIP):
+            pass
+        return requested
 
     def skip(self, task_id: Optional[str] = None) -> None:
         """Request the current task be skipped.

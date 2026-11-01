@@ -665,10 +665,15 @@ class TestOverlay(unittest.TestCase):
 
     def test_get_current_page_safe_auto_reconnects_when_cdp_disconnected(self):
         orchestrator = AgentOrchestrator.__new__(AgentOrchestrator)
-        orchestrator.browser_mgr = MagicMock()
-        orchestrator.browser_mgr.is_open = True
+        from browser_manager import BrowserManager
+        from types import SimpleNamespace
+        from models import AgentPhase
+        orchestrator.browser_mgr = BrowserManager.__new__(BrowserManager)
+        orchestrator.browser_mgr._closing = False
+        orchestrator.browser_mgr._recovery_lock = asyncio.Lock()
+        orchestrator.state = SimpleNamespace(phase=AgentPhase.IDLE)
 
-        browser = MagicMock()
+        browser = SimpleNamespace()
         browser.is_cdp_connected = False
         reconnected = [False]
 
@@ -677,6 +682,7 @@ class TestOverlay(unittest.TestCase):
             browser.is_cdp_connected = True
 
         browser.reconnect = AsyncMock(side_effect=mock_reconnect)
+        orchestrator.browser_mgr._browser = browser
         mock_page = MagicMock()
         browser.get_current_page = AsyncMock(return_value=mock_page)
 

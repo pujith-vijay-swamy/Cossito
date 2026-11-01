@@ -14,12 +14,12 @@ class TaskSelectionRecoveryTests(unittest.IsolatedAsyncioTestCase):
         task.target_selector = '#obsolete'
         page = SimpleNamespace(evaluate=AsyncMock(side_effect=[None, 'Clicked question by identity']))
         orch = SimpleNamespace(browser_mgr=SimpleNamespace(get_browser=AsyncMock()),
-            _get_current_page_safe=AsyncMock(return_value=page), _log=Mock(),
+            _get_current_page_safe=AsyncMock(return_value=page), _recover_task_page=AsyncMock(), _log=Mock(),
             _extract_problem_from_dom_direct=AsyncMock(return_value=('', [
                 {'identity': '["Chapter B", "part 001"]', 'selector': '#current'}], [])))
-        with patch('recon_engine.asyncio.sleep', new=AsyncMock()), patch('recon_engine.wait_for_page_ready', new=AsyncMock()) as ready:
+        with patch('recon_engine.asyncio.sleep', new=AsyncMock()), patch('recon_engine.wait_for_page_ready', new=AsyncMock(return_value=page)) as ready:
             await ReconEngine(orch).navigate_to_task_question(task, 2)
-        ready.assert_awaited_once_with(page)
+        ready.assert_awaited_once_with(page, recover_page=orch._recover_task_page)
         self.assertEqual(task.target_selector, '#current')
         self.assertEqual(page.evaluate.await_args_list[-1].args[1]['taskSelector'], '#current')
         orch._extract_problem_from_dom_direct.assert_awaited_once()

@@ -46,6 +46,8 @@ class BrowserManager:
         self._user_data_dir = user_data_dir or _DEFAULT_PROFILE_DIR
         self._browser: Optional[Browser] = None
         self._lifecycle_lock = asyncio.Lock()
+        self._recovery_lock = asyncio.Lock()
+        self._closing = False
 
         # Ensure the profile directory exists.
         Path(self._user_data_dir).mkdir(parents=True, exist_ok=True)
@@ -95,8 +97,47 @@ class BrowserManager:
         # Chrome owns profile locks. Never delete them while a session may be alive.
 
         if self._browser is None:
+            self._closing = False
             self._browser = self._build_browser()
         return self._browser
+
+    async def ensure_connection(self, browser=None) -> None:
+        """Serialize repair and cooperate with browser-use's in-flight recovery."""
+        browser = browser or self._browser
+        if browser is None or self._closing:
+            raise ConnectionError('Browser session has been closed')
+        async with self._recovery_lock:
+            if self._closing or browser is not self._browser:
+                raise ConnectionError('Browser session has been replaced or closed')
+            async def reconnect():
+                event = getattr(browser, '_reconnect_event', None)
+                if getattr(browser, '_reconnecting', False) and event is not None:
+                    await event.wait()
+                if not getattr(browser, 'is_cdp_connected', False):
+                    # The library coordinates its own background reconnect with this call.
+                    repair = getattr(browser, '_auto_reconnect', None)
+                    if callable(repair):
+                        await repair(max_attempts=1)
+                        if getattr(browser, '_reconnecting', False) and event is not None:
+                            await event.wait()
+                    else:
+                        await browser.reconnect()
+                if not getattr(browser, 'is_cdp_connected', False):
+                    raise ConnectionError('Browser connection could not be restored')
+            await asyncio.wait_for(reconnect(), timeout=20.0)
+
+    async def recover_page(self, stale_page):
+        """Reacquire the same tab after CDP replacement; never navigate or create a tab."""
+        browser = self._browser
+        await self.ensure_connection(browser)
+        target = getattr(stale_page, 'target_id', None) or getattr(stale_page, '_target_id', None)
+        if not target:
+            raise ConnectionError('Cannot identify the disconnected task tab')
+        pages = await browser.get_pages()
+        for page in pages:
+            if (getattr(page, 'target_id', None) or getattr(page, '_target_id', None)) == target:
+                return page
+        raise ConnectionError('The task tab is no longer open; refusing to use another tab')
 
     async def open_target_page(self, url: str, timeout: float = 45.0):
         """Navigate once and follow document commit/active-target replacement."""
@@ -155,6 +196,7 @@ class BrowserManager:
 
     async def close(self) -> None:
         """Gracefully close the browser if it's open."""
+        self._closing = True
         if self._browser is not None:
             try:
                 import asyncio

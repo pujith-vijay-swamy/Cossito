@@ -1,15 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="520" viewBox="0 0 1280 520" role="img" aria-labelledby="title desc">
-<title id="title">Cossito — Read the task. Write the code. Prove it works.</title>
-<desc id="desc">Cinematic dark banner with acid-lime Cossito lettering, lavender orbit lines, and a browser agent workflow.</desc>
-<defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#101014"/><stop offset="1" stop-color="#281b39"/></linearGradient><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#c1a0ff" stroke-opacity=".07"/></pattern></defs>
-<rect width="1280" height="520" rx="24" fill="url(#bg)"/><rect width="1280" height="520" rx="24" fill="url(#grid)"/>
-<g fill="none" stroke="#c1a0ff"><ellipse cx="1110" cy="205" rx="205" ry="95" transform="rotate(-40 1110 205)" opacity=".5"/><ellipse cx="1110" cy="205" rx="205" ry="95" transform="rotate(40 1110 205)" opacity=".25"/><circle cx="1110" cy="205" r="115" opacity=".15"/></g>
-<path d="M1140 85l-88 132h63l-35 113 119-154h-65l47-91z" fill="#e9ff69"/>
-<rect x="58" y="46" width="271" height="34" rx="6" fill="#c1a0ff"/><text x="75" y="69" fill="#17111f" font-family="monospace" font-size="15" font-weight="700" letter-spacing="2">BROWSER-NATIVE / AI AGENT</text>
-<text x="52" y="242" fill="#e9ff69" font-family="Impact, Arial Black, sans-serif" font-size="160" font-weight="900" letter-spacing="-6">COSSITO.</text>
-<text x="60" y="298" fill="#fffbed" font-family="Arial, sans-serif" font-size="30" font-weight="700">Read the task. Write the code. Prove it works.</text>
-<text x="61" y="339" fill="#b9b6c5" font-family="Arial, sans-serif" font-size="19">One browser. A focused agent. You stay in control.</text>
-<path d="M60 385H1220" stroke="#554b62"/>
-<g font-family="monospace" font-size="16" letter-spacing="1"><text x="60" y="441" fill="#e9ff69">01 / DISCOVER</text><text x="355" y="441" fill="#c1a0ff">02 / BUILD</text><text x="650" y="441" fill="#94d5ff">03 / VERIFY</text><text x="945" y="441" fill="#fffbed">04 / CONTINUE</text></g>
-<rect x="60" y="475" width="1160" height="3" fill="#554b62"/><rect x="60" y="475" width="350" height="3" fill="#e9ff69"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="720" viewBox="0 0 1440 720" role="img" aria-labelledby="title desc">
+<title id="title">Cossito — Code beyond the chat.</title>
+<desc id="desc">An acid-lime and violet editorial poster with oversized Cossito typography, its C and lightning monogram, and a four-stage browser workflow.</desc>
+<defs>
+ <linearGradient id="ink" x2="1" y2="1"><stop stop-color="#111014"/><stop offset="1" stop-color="#22172f"/></linearGradient>
+ <linearGradient id="violet" x2="1" y2="1"><stop stop-color="#d8c5ff"/><stop offset="1" stop-color="#9670e7"/></linearGradient>
+ <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M32 0H0V32" fill="none" stroke="#fffbed" stroke-opacity=".055"/></pattern>
+ <clipPath id="frame"><rect width="1440" height="720" rx="20"/></clipPath>
+</defs>
+<g clip-path="url(#frame)">
+ <rect width="1440" height="720" fill="url(#ink)"/>
+ <rect width="1440" height="720" fill="url(#grid)"/>
+ <rect width="1440" height="62" fill="#e9ff69"/>
+ <g font-family="Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="2" fill="#17141c">
+  <text x="42" y="39">C / BROWSER AGENT</text><text x="890" y="39">READ. BUILD. VERIFY. CONTINUE.</text>
+ </g>
+ <text x="42" y="123" fill="#c7b3ed" font-family="monospace" font-size="15" letter-spacing="3">LESS CHAT WINDOW. MORE WORKSPACE.</text>
+ <text x="29" y="322" fill="#e9ff69" font-family="Impact, Arial Black, sans-serif" font-size="212" font-weight="900" letter-spacing="-2">COSSITO</text>
+ <rect x="48" y="355" width="795" height="3" fill="#e9ff69"/>
+ <text x="44" y="420" fill="#fffbed" font-family="Arial, sans-serif" font-size="43" font-weight="700" letter-spacing="-1">Code beyond the chat.</text>
+ <text x="47" y="463" fill="#c0b9ca" font-family="Arial, sans-serif" font-size="21">From the first requirement to the final verdict.</text>
+ <text x="47" y="494" fill="#c0b9ca" font-family="Arial, sans-serif" font-size="21">One shared browser. Human control throughout.</text>
+ <g transform="translate(947 105)">
+  <rect x="12" y="15" width="445" height="421" rx="8" fill="#08070b"/>
+  <rect width="445" height="421" rx="8" fill="url(#violet)"/>
+  <path d="M0 54H445M0 364H445" stroke="#251635" stroke-width="2"/>
+  <text x="22" y="34" fill="#251635" font-family="monospace" font-size="15" letter-spacing="2">THE WORKSPACE IS THE CANVAS</text>
+  <g fill="none" stroke="#3e275a" opacity=".25"><circle cx="224" cy="213" r="136"/><circle cx="224" cy="213" r="105"/><path d="M20 213H425M224 65V352"/></g>
+  <g transform="translate(83 66) scale(8.4)">
+   <path d="M24 7H12L6 13V23L10 27H23L26 21H14L12 19V15L15 12H21L24 7Z" fill="#17141c"/>
+   <path d="M25 3L19 15H24L21 24L30 12H25L29 3H25Z" fill="#fffbed"/>
+  </g>
+  <text x="22" y="398" fill="#251635" font-family="monospace" font-size="15" letter-spacing="2">HUMAN + AGENT / SHARED CONTROL</text>
+ </g>
+ <path d="M0 572H1440" stroke="#554460"/>
+ <g font-family="monospace">
+  <g fill="#e9ff69" font-size="14" letter-spacing="2"><text x="48" y="611">01 / RECON</text><text x="402" y="611">02 / EXECUTION</text><text x="756" y="611">03 / VERIFICATION</text><text x="1110" y="611">04 / CONTROL</text></g>
+  <g fill="#fffbed" font-size="22" font-weight="700"><text x="48" y="649">Read the real task.</text><text x="402" y="649">Write to its editor.</text><text x="756" y="649">Inspect the result.</text><text x="1110" y="649">Choose what is next.</text></g>
+ </g>
+ <rect y="692" width="480" height="28" fill="#e9ff69"/><rect x="480" y="692" width="480" height="28" fill="#b89aea"/><rect x="960" y="692" width="480" height="28" fill="#fffbed"/>
+</g>
 </svg>

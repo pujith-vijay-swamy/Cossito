@@ -1,53 +1,58 @@
 <div align="center">
 
-![Cossito — Read the task. Write the code. Prove it works.](assets/readme-banner.svg)
+<img src="assets/readme-banner.svg" width="100%" alt="Cossito — Code beyond the chat. Read, build, verify, continue." />
 
-**A browser agent for coding tasks. Built to act. Designed to stay accountable.**
+### The task is on the page. So is the agent.
 
-![Python](https://img.shields.io/badge/Python-101014?style=for-the-badge&logo=python&logoColor=e9ff69)
-![Streamlit](https://img.shields.io/badge/Streamlit-101014?style=for-the-badge&logo=streamlit&logoColor=c1a0ff)
-![Browser automation](https://img.shields.io/badge/Browser_Automation-101014?style=for-the-badge&logo=googlechrome&logoColor=94d5ff)
-![Human in the loop](https://img.shields.io/badge/Human_in_the_Loop-e9ff69?style=for-the-badge&labelColor=101014)
+A browser agent that reads coding tasks, edits their workspaces, and checks the results.
 
-[Start here](#launch-cossito) · [What it does](#from-page-to-proof) · [Architecture](#under-the-hood) · [Development](#build-on-it)
+![Python](https://img.shields.io/badge/PYTHON-111014?style=for-the-badge&logo=python&logoColor=e9ff69)
+![Streamlit](https://img.shields.io/badge/STREAMLIT-111014?style=for-the-badge&logo=streamlit&logoColor=c7b3ed)
+![Browser-use](https://img.shields.io/badge/BROWSER--USE-e9ff69?style=for-the-badge&labelColor=111014)
+![Human control](https://img.shields.io/badge/HUMAN_IN_THE_LOOP-c7b3ed?style=for-the-badge&labelColor=111014)
+
+[**Launch →**](#launch) · [**Explore →**](#the-workflow) · [**Take control →**](#your-controls) · [**Go deeper →**](#inside-cossito)
 
 </div>
 
 ---
 
-## Your browser. With follow-through.
+## Code with somewhere to go.
 
-Cossito opens a coding workspace, reads its requirements, builds a task queue, writes solutions into the editor, and checks the platform's results. A floating control panel keeps progress, logs, and pause/resume controls close to the work.
+Cossito takes the coding workflow into a real browser: discover the lesson, read its requirements, inspect the existing code, write into the right editor, and look for a verified result. A persistent browser session connects the steps; a floating overlay keeps you close to the action.
 
-The interface brings acid lime, lavender, cinematic typography, and animated controls. Underneath, a shared browser session and explicit task states keep reconnaissance, execution, and verification connected.
+Acid lime. Lavender. Oversized typography. Animated controls. The interface has a personality; the task lifecycle has explicit states and recorded evidence.
 
-> **Writing code is a step. Verified completion is the finish line.**
+> **The code being written is progress. The platform confirming it works is completion.**
 
-## From page to proof
+## The workflow
 
-| Phase | What happens |
-| :--- | :--- |
-| **01 — Discover** | Read the loaded task, distinguish requirements from page navigation, and build the queue. |
-| **02 — Build** | Inspect the existing code, preserve the required structure, and write through editor adapters. |
-| **03 — Verify** | Discover Submit, Run Tests, Check, or automatic completion; inspect the actual result. |
-| **04 — Continue** | Complete verified work, repair confirmed failures, or pause when evidence is inconclusive. |
+| `01` READ | `02` BUILD | `03` VERIFY | `04` CONTINUE |
+| :--- | :--- | :--- | :--- |
+| Discover tasks and their destinations. | Inspect each editor before writing. | Find the page's validation workflow. | Advance, repair, pause, or skip. |
+| Distinguish lesson content from loading screens and navigation. | Preserve boilerplate and verify writes by reading them back. | Inspect test results and explicit completion evidence. | Keep unresolved work intact for review. |
 
-### The details that make a difference
+### One workspace. Several moving parts.
 
-- **One persistent browser.** Reuse the workspace and login session across tasks.
-- **Multiple editor families.** Adapters for Monaco, CodeMirror 5/6, Ace, textareas, and contenteditable surfaces.
-- **Optional visual references.** Extract reference images when available; continue from written requirements when none exist.
-- **Adaptive validation.** Inspect available controls instead of assuming every page has a Submit button.
-- **Evidence before success.** Read test counts, explicit completion messages, and scoped completed-state controls. Failure evidence takes precedence.
-- **Preserve working state.** Avoid rewriting matching editor content; inspect an unresolved submission before generating another solution.
-- **Redirect-aware navigation.** Keep the validated startup destination so canonical host and HTTPS redirects do not trigger restoration loops.
-- **Human control.** Pause, resume, stop, skip, or provide suggestions through the UI and browser overlay.
+- **Multiple editors, separate files.** Monaco, CodeMirror 5/6, Ace, and plain text surfaces. Use observed file or editor identifiers to route changes; ambiguous targets need clarification.
+- **Task identity beyond a label.** Destination links and scoped navigation help distinguish repeated names such as “Part 001.” Nested controls sharing a destination are deduplicated.
+- **References when they exist.** Images can inform frontend work. A task without a reference image can proceed from its written requirements.
+- **Validation that follows the page.** Discover Submit, Check, Run Tests, or automatic validation instead of assuming one button exists everywhere.
+- **Completion dialogs are part of the workflow.** Finalize an observed successful result before navigating through a modal-blocked workspace.
+- **Connection recovery with continuity.** Bounded recovery reacquires the same open task tab. It does not intentionally reload the lesson or rewrite the solution.
 
-These are supported behaviors, not a promise that every website or model will work without adjustment. Unusual editors, inaccessible results, and ambiguous completion flows may still need human input.
+<details>
+<summary><strong>What Cossito will not assume</strong></summary>
 
-## Launch Cossito
+A Next button does not establish success. A timeout does not establish failure. A model saying “done” does not replace platform evidence. A result on another task must not complete the current one.
 
-### 1. Clone and create an environment
+Unfamiliar editors, missing results, model failures, and ambiguous page structures can still require human intervention. Support for an editor family is not a guarantee for every integration of that editor.
+
+</details>
+
+## Launch
+
+### 01 / Get the workspace
 
 ```bash
 git clone https://github.com/pujith-vijay-swamy/Cossito.git
@@ -55,127 +60,172 @@ cd Cossito
 python -m venv .venv
 ```
 
-Activate it on **Windows PowerShell**:
+<details open>
+<summary><strong>Windows · PowerShell</strong></summary>
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-Or on **macOS / Linux**:
+</details>
+
+<details>
+<summary><strong>macOS / Linux</strong></summary>
 
 ```bash
 source .venv/bin/activate
 ```
 
-### 2. Install the dependencies
+</details>
+
+### 02 / Install
 
 ```bash
 python -m pip install -r requirements.txt
 python -m playwright install chromium
 ```
 
-Dependency versions are lower bounds, not a locked environment. Use a Python version compatible with the installed browser-use release.
+Dependencies use minimum versions rather than a lockfile. Choose a Python version compatible with the browser-use version you install. Provider-specific dependencies may also be needed.
 
-### 3. Configure a provider
+### 03 / Connect a model
 
-Select a provider, model, and API key in the sidebar. The UI offers OpenRouter, OpenAI, Anthropic, Google Gemini, Ollama, and local OpenAI-compatible endpoints. Provider-specific dependencies and model capabilities vary.
+Choose a provider, model, and API key in the sidebar. Integrations include OpenRouter, OpenAI, Anthropic, Google Gemini, Ollama, and local OpenAI-compatible endpoints. Availability and capabilities depend on your provider and installed packages.
 
-For OpenRouter, you can also copy `.env.example` to `.env` and set:
+For OpenRouter, copy [`.env.example`](.env.example) to `.env` and set:
 
 ```dotenv
 OPENROUTER_API_KEY=your-key-here
 ```
 
-For local providers, configure the model name and base URL in the sidebar. Keep `.env`, credentials, and the persistent `browser_profile/` directory out of commits; they are already ignored.
+Local models use the model name and base URL configured in the sidebar. Credentials, `.env`, and `browser_profile/` are ignored by Git.
 
-### 4. Start the interface
+### 04 / Start Cossito
 
 ```bash
 python -m streamlit run app.py
 ```
 
-Open the local address printed by Streamlit, enter the **target coding-page URL**, choose your model, and select **Start Agent**. The target URL is the workspace Cossito should operate on; it is separate from Cossito's own UI address.
+Open the address printed by Streamlit. Enter the **target coding-page URL**, configure your model, and click **Start Agent**. Cossito's local interface and the target website are two separate addresses.
 
-Complete login or other human prompts in the controlled browser when requested, then resume. After changing backend Python modules, fully restart Streamlit so the next run loads the updated implementation.
+Complete login or human verification in the controlled browser when prompted. After backend changes, fully restart Streamlit to load the new code.
 
-## A cockpit, not a black box
+## Your controls
 
-**The main panel** configures the run and shows task progress, generated code, and logs. **The floating overlay** brings the same working context into the target browser, with a minimized view when you need the page space back.
+The main panel shows configuration, progress, code, and logs. The floating browser overlay keeps controls beside the task, and minimizes when you want the page space back.
 
-If verification remains unknown, preserve the page and inspect its result. A timeout is not proof of failure, a Next button is not proof of success, and model confidence is not a substitute for platform evidence.
+| You want to… | Use… | What to expect |
+| :--- | :--- | :--- |
+| Take a look before continuing | **Pause** | Pause at the next supported control checkpoint. |
+| Recheck an unresolved submission | **Resume** | Reinspect the existing result without automatically rewriting the code. |
+| Leave this problem behind | A skip instruction | Preserve its code and result, record it as **skipped**, and continue the queue. |
+| Guide the implementation | **Human Suggestion** | Supply instructions for the task. |
+| End the run | **Stop** | Signal cancellation and stop further work. |
 
-## Under the hood
+> [!IMPORTANT]
+> Skip instructions currently use explicit phrase patterns, not unrestricted language understanding. Examples include **“skip,” “please skip this problem,” “skip the same problem,” “next task,”** and **“go to next lesson.”** Unusual wording may not match. Skipped tasks are not counted as passed.
+
+### When a run needs attention
+
+| What you see | What it means / next step |
+| :--- | :--- |
+| **No verified final verdict** | No fresh result was established. Run the page's tests and Resume, or skip the task. |
+| **Different task displayed** | Restore the pending task to verify it, or skip it. Results are not transferred between lessons. |
+| **Client is stopping** | The browser connection is being replaced or closed. Recovery is bounded and requires the original tab to remain available. |
+| **Loading or unavailable content** | The lesson is not yet readable. Successful completion dialogs are handled separately; unrelated dialogs need your attention. |
+| **Ambiguous editor destination** | Reinspect the editor list and use the observed identifier for each file. |
+
+## Inside Cossito
 
 ```mermaid
-flowchart TD
-    UI[Streamlit interface] --> ORCH[AgentOrchestrator]
-    ORCH --> RECON[ReconEngine]
-    ORCH --> TASK[TaskSubagent]
-    ORCH <--> HUMAN[Human controls and overlay]
-    RECON --> BROWSER[Shared browser session]
-    TASK --> ACTIONS[Controller actions]
-    ACTIONS --> EDITOR[Editor adapters]
-    ACTIONS --> PLATFORM[Platform adapters]
-    EDITOR --> BROWSER
-    PLATFORM --> BROWSER
-    PLATFORM --> VERIFY[Verification]
-    VERIFY --> STATE[Task state and evidence]
-    STATE --> ORCH
+flowchart LR
+    UI["Human controls<br/>Streamlit + overlay"] <--> O["AgentOrchestrator"]
+    O --> R["ReconEngine<br/>Discover + select"]
+    O --> T["TaskSubagent<br/>Execute one task"]
+    T --> A["Controller actions"]
+    A --> E["Editor adapters<br/>Snapshot + write + readback"]
+    A --> P["Platform adapters<br/>Validate + observe"]
+    R --> B["Shared browser session"]
+    E --> B
+    P --> B
+    P --> V["Verification<br/>Verdict + freshness"]
+    V --> O
+    style O fill:#e9ff69,color:#111014,stroke:#111014
+    style B fill:#c7b3ed,color:#111014,stroke:#111014
+    style V fill:#fffbed,color:#111014,stroke:#111014
 ```
 
-| File | Responsibility |
+<details>
+<summary><strong>Open the source map</strong></summary>
+
+| Module | Responsibility |
 | :--- | :--- |
-| [`app.py`](app.py) | Streamlit interface and background-run controls |
-| [`agent_core.py`](agent_core.py) | Orchestration, task lifecycle, workspace recovery |
-| [`recon_engine.py`](recon_engine.py) | Task discovery and selection |
-| [`task_subagent.py`](task_subagent.py) | Per-task execution and result handling |
-| [`controller_actions.py`](controller_actions.py) | Code-writing, validation, verification, and human actions |
-| [`browser_manager.py`](browser_manager.py) | Persistent browser startup and page acquisition |
-| [`dom_extraction.py`](dom_extraction.py) | Page readiness, task text, and reference extraction |
-| [`editor_adapters.py`](editor_adapters.py) | Editor detection, snapshots, writes, and readback |
+| [`app.py`](app.py) | Streamlit UI and run controls |
+| [`agent_core.py`](agent_core.py) | Task orchestration and workspace safeguards |
+| [`recon_engine.py`](recon_engine.py) | Discovery, identity, and task selection |
+| [`task_subagent.py`](task_subagent.py) | Per-task execution and pending-result checks |
+| [`controller_actions.py`](controller_actions.py) | Writing, validation, result reporting, and human actions |
+| [`browser_manager.py`](browser_manager.py) | Shared browser lifecycle and connection recovery |
+| [`dom_extraction.py`](dom_extraction.py) | Readiness, requirements, and reference extraction |
+| [`editor_adapters.py`](editor_adapters.py) | Editor targeting and verified writes |
 | [`platform_adapters.py`](platform_adapters.py) | Validation controls and visible result extraction |
 | [`verification.py`](verification.py) | Verdict parsing and stale-evidence checks |
-| [`models.py`](models.py) / [`state_machine.py`](state_machine.py) | Typed data and task transitions |
-| [`llm_provider.py`](llm_provider.py) / [`prompts.py`](prompts.py) | Model integrations and instructions |
-| [`human_loop.py`](human_loop.py) / [`overlay_manager.py`](overlay_manager.py) | Pause/resume coordination and browser controls |
+| [`models.py`](models.py) · [`state_machine.py`](state_machine.py) | Data, evidence, budgets, and task transitions |
+| [`human_loop.py`](human_loop.py) · [`overlay_manager.py`](overlay_manager.py) | Human commands, pause coordination, and browser overlay |
+| [`llm_provider.py`](llm_provider.py) · [`prompts.py`](prompts.py) | Providers and agent instructions |
 | [`runtime_evolution.py`](runtime_evolution.py) | Bounded recovery and skill-learning support |
 
-## Build on it
+</details>
 
-Run the Python suite:
+## Build. Break. Verify.
+
+Focused Python checks:
+
+```bash
+python -m unittest discover -s tests -p "test_execution_progress.py" -v
+python -m unittest discover -s tests -p "test_skip_controls.py" -v
+python -m unittest discover -s tests -p "test_browser_recovery.py" -v
+python -m unittest discover -s tests -p "test_page_readiness.py" -v
+```
+
+The full Python suite:
 
 ```bash
 python -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-Or focus on a behavior:
+<details>
+<summary><strong>Browser fixtures · Python + Node.js</strong></summary>
+
+The Python multi-editor browser tests use installed Google Chrome by default. Set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use another compatible browser binary.
 
 ```bash
-python -m unittest discover -s tests -p "test_workspace_navigation.py" -v
-python -m unittest discover -s tests -p "test_submission_actions.py" -v
-python -m unittest discover -s tests -p "test_verification.py" -v
+python -m unittest discover -s tests -p "test_multi_editor_browser.py" -v
 ```
 
-Browser fixtures use Node.js and the **Node Playwright package**, separately from the Python dependency:
+Node fixtures require the **Node Playwright package**, separately from Python Playwright:
 
 ```bash
 npm install --no-save --package-lock=false playwright
 npx playwright install chromium
-node --test tests/test_submission_dom.cjs tests/test_completion_workflows.cjs
+node --test tests/test_page_readiness.cjs tests/test_completion_workflows.cjs
 ```
 
-You can point `PLAYWRIGHT_CHROMIUM_EXECUTABLE` at an existing Chrome/Chromium binary for those fixtures. Keep local `node_modules/` out of commits.
+These fixtures also accept `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. Local `node_modules/` stays out of commits.
 
-Tests cover specific behavior; focused passing tests do not imply every provider, website, or full-suite configuration has been validated. When reporting a bug, include the task stage, visible result, and relevant logs with secrets removed.
+</details>
+
+Focused checks validate specific behaviors, not every website/provider combination or full live execution. For a useful bug report, include the task stage, visible result, and relevant logs with credentials and private website details removed.
 
 ---
 
 <div align="center">
 
-<img src="assets/cossito-mark.svg" width="48" alt="Cossito monogram" />
+<img src="assets/cossito-mark.svg" width="64" alt="Cossito C and lightning mark" />
 
-**READ → BUILD → VERIFY → CONTINUE**
+### READ THE PAGE. WRITE THE CODE. CHECK THE PROOF.
 
-*Made for the moment when the code has to leave the chat and work in the browser.*
+**COSSITO** / The browser is where it happens.
+
+[Back to the top ↑](#)
 
 </div>

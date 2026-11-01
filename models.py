@@ -117,6 +117,7 @@ class TaskStatus(str, Enum):
     SUCCESS = "success"
     FAILED = "failed"
     RETRYING = "retrying"
+    SKIPPED = "skipped"
 
 
 # ---------------------------------------------------------------------------
@@ -540,7 +541,7 @@ class CodingTask(BaseModel):
             TaskState.REPAIRING: TaskStatus.RETRYING,
             TaskState.NEEDS_INPUT: TaskStatus.IN_PROGRESS,
             TaskState.FAILED: TaskStatus.FAILED,
-            TaskState.SKIPPED: TaskStatus.SUCCESS,
+            TaskState.SKIPPED: TaskStatus.SKIPPED,
             TaskState.CANCELLED: TaskStatus.FAILED,
         }
         return _MAP.get(self.state, TaskStatus.PENDING)
@@ -554,6 +555,7 @@ class CodingTask(BaseModel):
             TaskStatus.SUCCESS: TaskState.PASSED,
             TaskStatus.FAILED: TaskState.FAILED,
             TaskStatus.RETRYING: TaskState.REPAIRING,
+            TaskStatus.SKIPPED: TaskState.SKIPPED,
         }
         self.state = _REVERSE.get(value, self.state)
 

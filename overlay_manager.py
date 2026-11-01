@@ -419,6 +419,9 @@ class OverlayManager:
                     if "suggestions" not in self._orch.control_flags:
                         self._orch.control_flags["suggestions"] = []
                     self._orch.control_flags["suggestions"].append(payload)
+                    from human_loop import is_skip_directive
+                    if is_skip_directive(payload):
+                        self._orch.hitl.skip()
                     self._orch._log(f"\U0001f4ac Suggestion from overlay: {payload}", "success")
 
         except Exception:

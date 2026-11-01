@@ -59,3 +59,26 @@ class ReadinessTests(unittest.IsolatedAsyncioTestCase):
             with self.assertRaisesRegex(RuntimeError, 'completion dialog'):
                 await wait_for_page_ready(page, timeout=.03, poll_interval=.001)
             finish.assert_awaited_once()
+
+    async def test_disconnect_reacquires_page_and_restarts_stability_check(self):
+        ready = {'text':'Change the width to 80%.', 'busy':False}
+        stale = SimpleNamespace(evaluate=AsyncMock(side_effect=[ready, ConnectionError('Client is stopping')]))
+        fresh = SimpleNamespace(evaluate=AsyncMock(return_value=ready))
+        recover = AsyncMock(return_value=fresh)
+        result = await wait_for_page_ready(stale, timeout=.5, poll_interval=.001, recover_page=recover)
+        self.assertIs(result, fresh)
+        self.assertEqual(fresh.evaluate.await_count, 2)
+        recover.assert_awaited_once_with(stale)
+
+    async def test_repeated_disconnect_is_bounded(self):
+        page = SimpleNamespace(evaluate=AsyncMock(side_effect=ConnectionError('Client is stopping')))
+        recover = AsyncMock(return_value=page)
+        with self.assertRaisesRegex(ConnectionError, 'has not been rewritten'):
+            await wait_for_page_ready(page, timeout=.5, poll_interval=.001, recover_page=recover)
+        self.assertEqual(recover.await_count, 2)
+
+    async def test_stop_during_recovery_propagates(self):
+        page = SimpleNamespace(evaluate=AsyncMock(side_effect=ConnectionError('Client is stopping')))
+        recover = AsyncMock(side_effect=asyncio.CancelledError())
+        with self.assertRaises(asyncio.CancelledError):
+            await wait_for_page_ready(page, timeout=.5, recover_page=recover)

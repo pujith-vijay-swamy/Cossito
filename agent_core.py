@@ -98,7 +98,7 @@ from state_machine import TaskStateMachine, transition, can_transition, is_termi
 from verification import verify_submission, is_submission_successful, is_result_stale, parse_test_results
 from editor_adapters import detect_editor, safe_write, MonacoAdapter, EditorAdapter
 from platform_adapters import detect_platform, wait_for_terminal
-from human_loop import HumanInTheLoopController, ControlCommand
+from human_loop import HumanInTheLoopController, ControlCommand, consume_skip_request, is_skip_directive
 from controller_actions import build_controller, consume_suggestions_block
 from overlay_manager import OverlayManager
 from recon_engine import ReconEngine
@@ -556,6 +556,10 @@ class AgentOrchestrator:
             # ---- HITL check (use the task's expected URL context) ----
             await self._hitl_gate(self.url)
 
+            if task.state == TaskState.SKIPPED:
+                self._log(f'⏩ {task.platform_task.title or f"Task #{idx + 1}"} was skipped; continuing.', 'info')
+                continue
+
             # If task was already completed on platform, skip to next
             if task.status == TaskStatus.SUCCESS and task.state == TaskState.PASSED:
                 self._log(f"⏩ {task.platform_task.title or f'Task #{idx + 1}'} already completed on platform. Advancing to next.", "info")
@@ -653,7 +657,7 @@ class AgentOrchestrator:
         browser = await self.browser_mgr.get_browser()
         page = await self._get_current_page_safe(browser)
         if page is not None:
-            await wait_for_page_ready(page)
+            page = await wait_for_page_ready(page, recover_page=self._recover_task_page)
             current_url = await page.get_url()
             if self._is_workspace_url(current_url):
                 self._workspace_url = current_url
@@ -743,6 +747,12 @@ class AgentOrchestrator:
 
         attempt_num = 0
         while task.budgets.has_code_repairs():
+            if consume_skip_request(self) or task.state == TaskState.SKIPPED:
+                task.status = TaskStatus.SKIPPED
+                task.state = TaskState.SKIPPED
+                self._log(f'⏭️ {task_label} — skipped by user; code and result preserved.', 'warn')
+                self._notify()
+                return
             attempt_num += 1
             self._execution_blocked_reason = None
             attempt_label = f"(attempt {attempt_num}; {task.budgets.code_repairs} repairs available)"
@@ -773,7 +783,7 @@ class AgentOrchestrator:
                 return
 
             # Check if user requested skip
-            if self.hitl.skip_requested or task.state == TaskState.SKIPPED:
+            if consume_skip_request(self) or task.state == TaskState.SKIPPED:
                 task.status = TaskStatus.SKIPPED
                 if can_transition(task, TaskState.SKIPPED):
                     transition(task, TaskState.SKIPPED)
@@ -786,7 +796,7 @@ class AgentOrchestrator:
             if self._execution_blocked_reason:
                 self._set_phase(AgentPhase.PAUSED_HITL)
                 pending_result = bool(task.submissions and not task.submissions[-1].terminal)
-                next_step = 'Resume to check the existing result without rewriting code.' if pending_result else 'Check the page or model connection, then Resume to re-read the task.'
+                next_step = 'Resume to recheck the existing result, or send ‘skip this task’ to continue without marking it passed.' if pending_result else 'Check the page or model connection, then Resume to re-read the task.'
                 self.state.hitl_reason = f"Execution paused: {self._execution_blocked_reason.rstrip('.')}. {next_step}"
                 self._log(self.state.hitl_reason, "error")
                 self._notify()
@@ -958,9 +968,9 @@ class AgentOrchestrator:
 
         if result.skipped:
             self._user_skip_requested = True
-            task.status = TaskStatus.SUCCESS
-            self._code_written_in_current_task = True
-            return True
+            task.status = TaskStatus.SKIPPED
+            task.state = TaskState.SKIPPED
+            return False
 
         if result.success:
             task.status = TaskStatus.SUCCESS
@@ -975,7 +985,7 @@ class AgentOrchestrator:
         elif any(marker in result.output_message.lower() for marker in ('json_invalid', 'invalid or incomplete json', 'invalid json')):
             self._execution_blocked_reason = result.output_message
         elif task.submissions and not task.submissions[-1].terminal:
-            self._execution_blocked_reason = 'The current submission still has no verified final verdict. Preserve it and inspect the result before retrying.'
+            self._execution_blocked_reason = result.output_message
         return False
 
     # ------------------------------------------------------------------
@@ -1024,53 +1034,16 @@ class AgentOrchestrator:
             except Exception:
                 return None
 
-        # Auto-heal using browser.reconnect() if CDP connection was dropped
-        if not getattr(browser, "is_cdp_connected", False):
-            if hasattr(browser, "reconnect") and callable(getattr(browser, "reconnect", None)):
-                try:
-                    reconn_res = browser.reconnect()
-                    if asyncio.iscoroutine(reconn_res) or hasattr(reconn_res, "__await__"):
-                        await reconn_res
-                except Exception:
-                    pass
-            if not getattr(browser, "is_cdp_connected", False):
-                return None
-
-        page = None
+        if getattr(self, "_stop_requested", False) or getattr(self, "control_flags", {}).get("stop_requested"):
+            return None
         try:
+            await self.browser_mgr.ensure_connection(browser)
             page = await browser.get_current_page()
-        except Exception:
-            # On connection error during get_current_page, attempt auto-heal via reconnect()
-            if hasattr(browser, "reconnect") and callable(getattr(browser, "reconnect", None)):
-                try:
-                    reconn_res = browser.reconnect()
-                    if asyncio.iscoroutine(reconn_res) or hasattr(reconn_res, "__await__"):
-                        await reconn_res
-                    page = await browser.get_current_page()
-                except Exception:
-                    page = None
-            else:
-                page = None
-
-        if page is None:
-            try:
+            if page is None:
                 pages = await browser.get_pages()
-                if pages:
-                    page = pages[0]
-            except Exception:
-                # If get_pages fails with connection error, attempt auto-heal via reconnect()
-                if hasattr(browser, "reconnect") and callable(getattr(browser, "reconnect", None)):
-                    try:
-                        reconn_res = browser.reconnect()
-                        if asyncio.iscoroutine(reconn_res) or hasattr(reconn_res, "__await__"):
-                            await reconn_res
-                        pages = await browser.get_pages()
-                        if pages:
-                            page = pages[0]
-                    except Exception:
-                        page = None
-                else:
-                    page = None
+                page = pages[0] if pages else None
+        except ConnectionError:
+            return None
 
         if page is not None and self.state.phase == AgentPhase.EXECUTING:
             # Resume can leave browser-use focused on a blank/new tab. Reuse the
@@ -1084,6 +1057,15 @@ class AgentOrchestrator:
                             await browser.get_or_create_cdp_session(target_id, focus=True)
                         break
             await self._restore_workspace_if_needed(page)
+        return page
+
+    async def _recover_task_page(self, stale_page):
+        if getattr(self, "_stop_requested", False) or getattr(self, "control_flags", {}).get("stop_requested"):
+            raise asyncio.CancelledError('Agent stopped during browser recovery')
+        self._log('Browser connection changed; reconnecting to the same task tab without reloading.', 'warn')
+        page = await self.browser_mgr.recover_page(stale_page)
+        if getattr(self, "_stop_requested", False) or getattr(self, "control_flags", {}).get("stop_requested"):
+            raise asyncio.CancelledError('Agent stopped during browser recovery')
         return page
 
     def _is_workspace_url(self, current_url: str) -> bool:
@@ -1300,13 +1282,12 @@ class AgentOrchestrator:
         # Intercept mid-run skip suggestions from overlay
         if self.control_flags and self.control_flags.get("suggestions"):
             suggs = self.control_flags["suggestions"].copy()
-            skip_keywords = ["skip", "next task", "go to next", "completed", "done", "ignore", "intro"]
             for s in suggs:
-                if any(kw in s.lower() for kw in skip_keywords):
-                    self._log(f"⏭️ User typed skip directive ('{s}') mid-run. Automatically completing current task!", "success")
+                if is_skip_directive(s):
+                    self._log(f"⏭️ User typed skip directive ('{s}') mid-run. Skipping the current task without marking it passed.", "success")
                     self._code_written_in_current_task = True
                     self._user_skip_requested = True
-                    self.control_flags["suggestions"].clear()
+                    self.control_flags["suggestions"].remove(s)
                     raise asyncio.CancelledError("Skipped by user suggestion.")
 
         # 2. Check for Stop Request

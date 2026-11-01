@@ -486,12 +486,8 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
     async def skip_current_task(reason: str = "Intro page or user requested skip") -> str:
         suggestions_block = consume_suggestions_block(orchestrator, "skip_current_task")
         orchestrator._log(f"⏭️ Skipping Task #{orchestrator.state.current_task_index + 1}: {reason}", "warn")
-        orchestrator._code_written_in_current_task = True
-        orchestrator._last_report = {
-            "task_id": orchestrator.state.current_task_index + 1,
-            "success": True,
-            "output": f"Task skipped: {reason}",
-        }
+        orchestrator._user_skip_requested = True
+        orchestrator._last_report = None
         return f"Task #{orchestrator.state.current_task_index + 1} skipped successfully. Call `done` now to advance to the next task.{suggestions_block}"
 
     @controller.action(

@@ -158,7 +158,7 @@ class ReconEngine:
             page = await self._orch._get_current_page_safe(browser)
             if page is None:
                 return None
-            await wait_for_page_ready(page)
+            page = await wait_for_page_ready(page, recover_page=self._orch._recover_task_page)
             extracted_text, section_questions, _ = await self._orch._extract_problem_from_dom_direct(page)
             extracted_text = clean_extracted_problem_text(extracted_text)
             if not extracted_text or len(extracted_text) < 30:
@@ -222,7 +222,7 @@ class ReconEngine:
         # Keep the destination reached by startup/login redirects as the
         # workspace. The original input may use HTTP or a noncanonical host.
         self._orch._log("Waiting for the main page content before reading tasks...", "info")
-        await wait_for_page_ready(page)
+        page = await wait_for_page_ready(page, recover_page=self._orch._recover_task_page)
         current_url = await page.get_url()
         await self._orch._hitl_gate(current_url)
         self._orch._workspace_url = current_url
@@ -381,7 +381,7 @@ class ReconEngine:
                     if click_res:
                         self._orch._log(f"🧭 {click_res}. Waiting for problem statement to hydrate...", "info")
                         await asyncio.sleep(1.5)
-                        await wait_for_page_ready(page)
+                        page = await wait_for_page_ready(page, recover_page=self._orch._recover_task_page)
                         try:
                             current_url = await page.get_url()
                         except Exception:
@@ -632,7 +632,7 @@ class ReconEngine:
 
             # A completion dialog can hide/inert the sidebar. Finalize its verified
             # result before selecting another task, never click through the modal.
-            await wait_for_page_ready(page)
+            page = await wait_for_page_ready(page, recover_page=self._orch._recover_task_page)
 
             task_key = task.platform_task.key or str(task.queue_index + 1)
             task_title = (task.platform_task.title or "").strip()

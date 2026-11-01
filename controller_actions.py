@@ -710,7 +710,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
     @controller.action(
         "Write the complete self-contained code solution into the active code editor on the page. "
         "Automatically takes a snapshot, verifies editor kind, and confirms write via readback. "
-        "For multi-editor pages (HTML/CSS), pass target_editor with 'html' or 'css' to select the matching editor."
+        "For multi-editor pages, write each file separately using the exact target_editor key returned by read_code_from_editor."
     )
     async def write_code_to_editor(code: str, target_editor: Optional[str] = None) -> str:
         # Check for stop request
@@ -785,7 +785,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
             orchestrator.state.current_solution_code = None
             orchestrator.state.failed_injection_code = code
             orchestrator._notify()
-            return f"Failed: No supported editor container found after 3 attempts.{suggestions_block}"
+            return f"Failed: The requested editor update could not be verified. Call read_code_from_editor again and write each file using its exact target_editor key.{suggestions_block}"
         except asyncio.CancelledError:
             raise
         except Exception as e:
@@ -796,7 +796,7 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
         "Write the solution and discover the page's completion workflow: Submit, Check, Run Tests, or automatic validation. "
         "Verify completion without clicking Next prematurely. This also supports pages without a Submit button. "
         "For a custom validation control, pass completion_control with its exact observed visible label; never invent a label or select navigation. "
-        "For multi-editor pages (HTML/CSS), pass target_editor with 'html' or 'css' if writing to a single editor."
+        "For multi-editor pages, pass the observed target_editor key when writing one file."
     )
     async def submit_code_solution(code: str, completion_control: Optional[str] = None, target_editor: Optional[str] = None) -> str:
         # Check for stop request
@@ -1016,9 +1016,9 @@ Analyze the provided screenshot of the web page and reply with a highly precise,
                     sections.append(
                         "🚨 MULTI-EDITOR OPERATIONAL MANDATE:\n"
                         "- NEVER write CSS into the HTML editor or HTML into the CSS editor!\n"
-                        "- To write HTML: call `write_code_to_editor(code=..., target_editor=\"html\")`\n"
-                        "- To write CSS: call `write_code_to_editor(code=..., target_editor=\"css\")`\n"
-                        "- Or submit both with `submit_code_solution(code=...)`."
+                        "- Write each file separately using its exact target_editor key shown above.\n"
+                        "- Do not infer editor order or combine different files in one editor.\n"
+                        "- Verify every required file before submitting."
                     )
                     output = "\n".join(sections)
                     return f"{output}\n\n{suggestions_block}"

@@ -630,6 +630,10 @@ class ReconEngine:
             if page is None:
                 return
 
+            # A completion dialog can hide/inert the sidebar. Finalize its verified
+            # result before selecting another task, never click through the modal.
+            await wait_for_page_ready(page)
+
             task_key = task.platform_task.key or str(task.queue_index + 1)
             task_title = (task.platform_task.title or "").strip()
 

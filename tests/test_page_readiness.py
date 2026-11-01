@@ -1,7 +1,7 @@
 import asyncio
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from dom_extraction import wait_for_page_ready, clean_extracted_problem_text, is_loading_placeholder
 
 class ReadinessTests(unittest.IsolatedAsyncioTestCase):
@@ -36,3 +36,26 @@ class ReadinessTests(unittest.IsolatedAsyncioTestCase):
         statement = 'Build a loading screen with an animated spinner using HTML and CSS.'
         self.assertFalse(is_loading_placeholder(statement))
         self.assertEqual(clean_extracted_problem_text(statement),statement)
+
+    async def test_verified_completion_dialog_is_finalized_before_readiness(self):
+        blocked = {'text': '', 'busy': False, 'dialog': 'Horray!!! You have passed all the test cases. Would you like to mark this block as completed?'}
+        ready = {'text': 'Change the width property to 80%.', 'busy': False}
+        page = SimpleNamespace(evaluate=AsyncMock(side_effect=[blocked, ready, ready]))
+        with patch('platform_adapters.finish_verified_completion', new=AsyncMock(return_value=['marked'])) as finish:
+            await wait_for_page_ready(page, timeout=.5, poll_interval=.001)
+            finish.assert_awaited_once_with(page, verified=True, advance=False)
+
+    async def test_unverified_dialog_never_clicks_or_unblocks_writing(self):
+        for text in ('Sign in to continue', '2 tests passed, 1 test failed'):
+            page = SimpleNamespace(evaluate=AsyncMock(return_value={'text':'Lesson text', 'busy':False, 'dialog':text}))
+            with patch('platform_adapters.finish_verified_completion', new=AsyncMock()) as finish:
+                with self.assertRaisesRegex(RuntimeError, 'dialog is blocking'):
+                    await wait_for_page_ready(page, timeout=.1, poll_interval=.001)
+                finish.assert_not_awaited()
+
+    async def test_completion_that_wont_close_is_not_clicked_repeatedly(self):
+        page = SimpleNamespace(evaluate=AsyncMock(return_value={'text':'', 'busy':False, 'dialog':'You have passed all the test cases.'}))
+        with patch('platform_adapters.finish_verified_completion', new=AsyncMock(return_value=[])) as finish:
+            with self.assertRaisesRegex(RuntimeError, 'completion dialog'):
+                await wait_for_page_ready(page, timeout=.03, poll_interval=.001)
+            finish.assert_awaited_once()

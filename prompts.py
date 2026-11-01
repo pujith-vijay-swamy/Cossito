@@ -237,9 +237,9 @@ If the problem workspace has 2 or more code editors (e.g. separate editors or ta
 - Call `read_code_from_editor` FIRST to inspect the boilerplate of ALL editors on the page!
 - NEVER write CSS code into the HTML editor!
 - NEVER write HTML code into the CSS editor!
-- To update the HTML editor: call `write_code_to_editor(code=..., target_editor="html")`
-- To update the CSS editor: call `write_code_to_editor(code=..., target_editor="css")`
-- When submitting, `submit_code_solution(code=...)` automatically directs CSS code to the CSS editor and HTML code to the HTML editor, or you can specify `target_editor="html"` / `target_editor="css"`.
+- Use the exact target_editor key returned for each file, and write each file separately. Never infer the editor from its position.
+- Preserve unrelated files. If multiple files share a language, use their distinct keys rather than a language name.
+- Verify all required files before submission. On a single-file page, preserve inline styles/scripts when appropriate.
 
 
 YOUR CURRENT TASK (Task #{{task_id}}):

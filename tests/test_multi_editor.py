@@ -5,7 +5,7 @@ and targeted code injection in HTML/CSS problem workspaces.
 
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from editor_adapters import (
     MonacoAdapter,
@@ -67,9 +67,11 @@ class TestMultiEditor(unittest.TestCase):
         written = {}
 
         async def mock_evaluate(script, *args):
-            if "(code, target) =>" in script or "(code) =>" in script:
-                if len(args) >= 2 and args[1]:
-                    written[args[1]] = args[0]
+            if "return results;" in script:
+                return '[{"kind":"monaco","language":"html","target_key":"html"},{"kind":"monaco","language":"css","target_key":"css"}]'
+            if "({code, target}) =>" in script or "(code) =>" in script:
+                if args and isinstance(args[0], dict):
+                    written[args[0]["target"]] = args[0]["code"]
                 else:
                     written["default"] = args[0] if args else ""
                 return True
@@ -99,9 +101,11 @@ class TestMultiEditor(unittest.TestCase):
         written = {}
 
         async def mock_evaluate(script, *args):
-            if "(code, target) =>" in script or "(code) =>" in script:
-                if len(args) >= 2 and args[1]:
-                    written[args[1]] = args[0]
+            if "return results;" in script:
+                return '[{"kind":"monaco","language":"html","target_key":"html"},{"kind":"monaco","language":"css","target_key":"css"}]'
+            if "({code, target}) =>" in script or "(code) =>" in script:
+                if args and isinstance(args[0], dict):
+                    written[args[0]["target"]] = args[0]["code"]
                 else:
                     written["default"] = args[0] if args else ""
                 return True
@@ -131,9 +135,11 @@ class TestMultiEditor(unittest.TestCase):
         written = {}
 
         async def mock_evaluate(script, *args):
-            if "(code, target) =>" in script or "(code) =>" in script:
-                if len(args) >= 2 and args[1]:
-                    written[args[1]] = args[0]
+            if "return results;" in script:
+                return '[{"kind":"monaco","language":"html","target_key":"html"},{"kind":"monaco","language":"css","target_key":"css"}]'
+            if "({code, target}) =>" in script or "(code) =>" in script:
+                if args and isinstance(args[0], dict):
+                    written[args[0]["target"]] = args[0]["code"]
                 else:
                     written["default"] = args[0] if args else ""
                 return True
@@ -197,6 +203,30 @@ class TestMultiEditor(unittest.TestCase):
             self.assertEqual(editors[1]["target_key"], "css")
         finally:
             loop.close()
+
+
+class MultiWriteFailureTests(unittest.IsolatedAsyncioTestCase):
+    async def test_partial_write_is_failure_and_never_retries_combined_code(self):
+        from models import WorkspaceSnapshot
+        editors = [{"language": lang, "target_key": lang} for lang in ("html", "css")]
+        with patch("editor_adapters.get_all_editors_summary", AsyncMock(return_value=editors)), patch(
+            "editor_adapters._safe_write_single", AsyncMock(side_effect=[
+                (True, WorkspaceSnapshot(), "<p>ok</p>"), (False, WorkspaceSnapshot(), "old css")
+            ])
+        ) as write:
+            ok, _, _ = await safe_write(object(), "```html\n<p>ok</p>\n```\n```css\np {color:red}\n```")
+            self.assertFalse(ok)
+            self.assertEqual(write.await_count, 2)
+            self.assertEqual(write.await_args_list[1].kwargs["target"], "css")
+
+    async def test_missing_destination_rejected_before_mutation(self):
+        editors = [{"language": lang, "target_key": lang} for lang in ("html", "javascript")]
+        with patch("editor_adapters.get_all_editors_summary", AsyncMock(return_value=editors)), patch(
+            "editor_adapters._safe_write_single", AsyncMock()
+        ) as write:
+            ok, _, _ = await safe_write(object(), "```html\n<p>ok</p>\n```\n```css\np {color:red}\n```")
+            self.assertFalse(ok)
+            write.assert_not_awaited()
 
 
 if __name__ == "__main__":

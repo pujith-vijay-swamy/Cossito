@@ -30,6 +30,8 @@ class TestEditorAdapters(unittest.TestCase):
             self.assertIn("=>", script, "Script must contain '=>'")
             if "models[0].setValue" in script:
                 return True
+            if "return models[0].uri.toString()" in script:
+                return "inmemory://model/1"
             if "getLanguageId" in script:
                 return "python"
             if "uri.toString" in script:
@@ -471,9 +473,9 @@ class TestEditorAdapters(unittest.TestCase):
             self.assertTrue(script.strip().startswith("("))
             self.assertIn("=>", script)
             # If target argument passed
-            if len(args) >= 2 and args[1]:
-                target = args[1]
-                code = args[0]
+            if args and isinstance(args[0], dict):
+                target = args[0]["target"]
+                code = args[0]["code"]
                 written[target] = code
                 return True
             if "models[0].setValue" in script:

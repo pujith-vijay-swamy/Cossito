@@ -21,3 +21,22 @@ test('readiness reads current visible content and excludes overlay and hidden sp
   assert.doesNotMatch(result.text, /Loading the workspace/);
  } finally {await browser.close();}
 });
+
+const finish = new Function(`return (${fs.readFileSync(require('node:path').join(__dirname,'..','platform_adapters.py'),'utf8').match(/POST_COMPLETION_SCRIPT = r"""([\s\S]*?)"""/)[1]});`)();
+test('completion dialog hiding a loaded lesson is finalized without clicking Next', async()=>{
+ const browser = await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE});
+ try {
+  const page=await browser.newPage();
+  await page.setContent('<div id="workspace" aria-hidden="true"><main><p>Change the width property to 80%.</p><button id="next">Next Lesson</button></main></div><div role="dialog"><p>You have passed all the test cases.</p><button id="mark">Mark as Completed</button></div>');
+  await page.evaluate(()=>{window.nextClicks=0;document.querySelector('#next').onclick=()=>window.nextClicks++;document.querySelector('#mark').onclick=()=>{document.querySelector('[role=dialog]').remove();document.querySelector('#workspace').removeAttribute('aria-hidden');};});
+  const blocked=await page.evaluate(read);
+  assert.equal(blocked.text,'');
+  assert.match(blocked.dialog,/passed all/);
+  assert.equal(await page.evaluate(finish,{marked:false,advance:false}),'marked');
+  const ready=await page.evaluate(read);
+  assert.match(ready.text,/Change the width/);
+  assert.equal(ready.busy,false);
+  assert.equal(ready.dialog,undefined);
+  assert.equal(await page.evaluate(()=>window.nextClicks),0);
+ } finally {await browser.close();}
+});

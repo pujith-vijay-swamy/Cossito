@@ -52,7 +52,7 @@ async def finish_verified_completion(page: Any, *, verified: bool, advance: bool
             action = parse_eval_result(raw)
             if action in ('marked', 'advanced', 'closed'):
                 actions.append(action)
-            if action in ('advanced', 'closed') or (action == 'idle' and not actions):
+            if action in ('advanced', 'closed') or action == 'idle':
                 break
             await asyncio.sleep(0.25)
     try:

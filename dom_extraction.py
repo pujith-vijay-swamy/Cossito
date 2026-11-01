@@ -124,17 +124,42 @@ PAGE_READINESS_SCRIPT = r"""() => {
         (root.getAttribute('aria-busy') === 'true') ||
         Array.from(root.querySelectorAll('[aria-busy="true"], [class*="skeleton" i]'))
             .some(el => !el.closest(excluded) && visible(el));
+    const dialogs = Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], dialog[open], [aria-modal="true"]'))
+        .filter(el => visible(el) && !el.closest('#__omnitasker_panel, [hidden], [aria-hidden="true"], [inert]'));
+    const dialog = dialogs.at(-1);
+    // Accessibility-hidden background content is normal while a modal is open.
+    // Keep it blocked, but report the actual obstacle rather than a loading screen.
+    if (dialog) return {text, busy, dialog: (dialog.innerText || '').trim()};
     return {text, busy};
 }"""
 
 
 async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: float = 0.3) -> None:
-    """Require stable application content, not just a committed URL or load event."""
+    """Wait for content, finishing an observed successful completion dialog first."""
+    last_reason = 'No readable lesson content was observed.'
     async def poll():
+        nonlocal last_reason
         previous = None
+        handled_completion = False
         while True:
             snapshot = parse_eval_result(await page.evaluate(PAGE_READINESS_SCRIPT))
             text = snapshot.get('text', '') if isinstance(snapshot, dict) else ''
+            if isinstance(snapshot, dict) and 'dialog' in snapshot:
+                from verification import parse_test_results, is_submission_successful
+                from platform_adapters import finish_verified_completion
+                record = parse_test_results(snapshot['dialog'])
+                if not is_submission_successful(record):
+                    raise RuntimeError('A dialog is blocking the lesson. Resolve it, then Resume; the agent has not changed the code.')
+                last_reason = 'A verified completion dialog is still blocking the lesson.'
+                if not handled_completion:
+                    handled_completion = True
+                    # Only finalize the visible result. Queue navigation selects the next task.
+                    await finish_verified_completion(page, verified=True, advance=False)
+                previous = None
+                await asyncio.sleep(poll_interval)
+                continue
+            last_reason = ('The lesson still reports loading.' if isinstance(snapshot, dict) and snapshot.get('busy')
+                           else 'No stable readable lesson content was observed.')
             ready = isinstance(snapshot, dict) and not snapshot.get('busy') and not is_loading_placeholder(text)
             if ready and text == previous:
                 return
@@ -143,7 +168,7 @@ async def wait_for_page_ready(page: Any, timeout: float = 30.0, poll_interval: f
     try:
         await asyncio.wait_for(poll(), timeout=timeout)
     except asyncio.TimeoutError as exc:
-        raise RuntimeError('Page content is still loading or unavailable; refusing to solve a loading screen.') from exc
+        raise RuntimeError(f'{last_reason} Page content is still loading or unavailable; refusing to solve a loading screen.') from exc
 
 
 def clean_extracted_problem_text(text: str) -> str:
@@ -938,285 +963,9 @@ async def inject_code_to_editor(page, code: str, target: Optional[str] = None) -
     if page is None:
         return None
 
-    if target is None:
-        from editor_adapters import split_multi_editor_code, classify_code_language
-        parts = split_multi_editor_code(code)
-        if "html" in parts and "css" in parts:
-            res_h = await inject_code_to_editor(page, parts["html"], target="html")
-            res_c = await inject_code_to_editor(page, parts["css"], target="css")
-            if res_h and res_c:
-                return f"{res_h} & {res_c}"
-            return res_h or res_c
-        classified = classify_code_language(code)
-        if classified in ("html", "css", "javascript"):
-            target = classified
-
-    js_script = """(code, target) => {
-        function setEditorCodeRecursively(doc, code, target) {
-            if (!doc) return null;
-            const win = doc.defaultView || window;
-
-            // 1. Monaco Editor (VS Code based)
-            try {
-                if (win.monaco && win.monaco.editor) {
-                    if (win.monaco.editor.getEditors) {
-                        const eds = win.monaco.editor.getEditors();
-                        for (const ed of eds) {
-                            try {
-                                if (ed.getDomNode() && ed.getDomNode().offsetParent !== null) {
-                                    ed.setValue(code);
-                                    return "Monaco Editor (active editor) updated in " + doc.location.href;
-                                }
-                            } catch(e) {}
-                        }
-                        if (eds.length > 0 && eds[0].getModel()) {
-                            eds[0].getModel().setValue(code);
-                            return "Monaco Editor (first editor) updated in " + doc.location.href;
-                        }
-                    }
-                    const models = win.monaco.editor.getModels();
-                    if (models && models.length > 0) {
-                        const validModels = models.filter(m => m.uri && !m.uri.path.endsWith('.d.ts'));
-                        const targetModel = validModels.length > 0 ? validModels[0] : models[0];
-                        targetModel.setValue(code);
-                        return "Monaco Editor (model) updated in " + doc.location.href;
-                    }
-                }
-            } catch(e) {}
-
-            // Custom window editor properties
-            for (const k of ['editor', 'monacoEditor', 'codeEditor']) {
-                try {
-                    if (win[k] && typeof win[k].setValue === 'function') {
-                        win[k].setValue(code);
-                        return "Custom editor (" + k + ") updated in " + doc.location.href;
-                    }
-                } catch(e) {}
-            }
-
-            // Bundled Monaco DOM fallback via inputarea
-            try {
-                const monacoEls = Array.from(doc.querySelectorAll('.monaco-editor'));
-                for (const mEl of monacoEls) {
-                    if (mEl.offsetParent !== null || monacoEls.length === 1) {
-                        const ta = mEl.querySelector('textarea.inputarea');
-                        if (ta) {
-                            ta.focus();
-                            doc.execCommand('selectAll', false, null);
-                            if (doc.execCommand('insertText', false, code)) {
-                                return "Monaco Editor (execCommand) updated in " + doc.location.href;
-                            }
-                            const dt = new DataTransfer();
-                            dt.setData('text/plain', code);
-                            const pasteEv = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
-                            ta.dispatchEvent(pasteEv);
-                            return "Monaco Editor (paste event) updated in " + doc.location.href;
-                        }
-                    }
-                }
-            } catch(e) {}
-
-            // 2. CodeMirror (v5)
-            try {
-                const cmElems = Array.from(doc.querySelectorAll('.CodeMirror'));
-                cmElems.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                for (const elem of cmElems) {
-                    if (elem.CodeMirror) {
-                        elem.CodeMirror.setValue(code);
-                        if (elem.CodeMirror.save) elem.CodeMirror.save();
-                        return "CodeMirror v5 code updated in " + doc.location.href;
-                    }
-                }
-            } catch(e) {}
-
-            // 3. CodeMirror 6
-            try {
-                const cmEditors = Array.from(doc.querySelectorAll('.cm-editor'));
-                cmEditors.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                for (const cmEditor of cmEditors) {
-                    const view = (cmEditor.cmView && (cmEditor.cmView.view || (typeof cmEditor.cmView.dispatch === 'function' ? cmEditor.cmView : null)));
-                    if (view && typeof view.dispatch === 'function') {
-                        view.dispatch({
-                            changes: { from: 0, to: view.state.doc.length, insert: code }
-                        });
-                        return "CodeMirror 6 dispatch updated in " + doc.location.href;
-                    }
-                }
-                const cmContents = Array.from(doc.querySelectorAll('.cm-content'));
-                cmContents.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                for (const el of cmContents) {
-                    const view = (el.cmView && (el.cmView.view || (typeof el.cmView.dispatch === 'function' ? el.cmView : null)));
-                    if (view && typeof view.dispatch === 'function') {
-                        view.dispatch({
-                            changes: { from: 0, to: view.state.doc.length, insert: code }
-                        });
-                        return "CodeMirror 6 content dispatch updated in " + doc.location.href;
-                    }
-                    try {
-                        el.focus();
-                        const sel = win.getSelection();
-                        const range = doc.createRange();
-                        range.selectNodeContents(el);
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                        if (doc.execCommand('insertText', false, code)) {
-                            return "CodeMirror 6 execCommand updated in " + doc.location.href;
-                        }
-                        const dt = new DataTransfer();
-                        dt.setData('text/plain', code);
-                        const pasteEv = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
-                        el.dispatchEvent(pasteEv);
-                        return "CodeMirror 6 paste event updated in " + doc.location.href;
-                    } catch(e) {}
-                }
-            } catch(e) {}
-
-            // 4. Ace Editor
-            try {
-                const aceElems = Array.from(doc.querySelectorAll('.ace_editor'));
-                aceElems.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                for (const elem of aceElems) {
-                    if (win.ace && win.ace.edit) {
-                        const editor = win.ace.edit(elem);
-                        if (editor) {
-                            editor.setValue(code, -1);
-                            return "Ace Editor code updated in " + doc.location.href;
-                        }
-                    }
-                    if (elem.env && elem.env.editor) {
-                        elem.env.editor.setValue(code, -1);
-                        return "Ace Editor (env) code updated in " + doc.location.href;
-                    }
-                }
-            } catch(e) {}
-
-            // 5. Standard Textarea
-            try {
-                const textareas = Array.from(doc.querySelectorAll('textarea')).filter(
-                    el => !el.closest('.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, #__omnitasker_panel')
-                );
-                textareas.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                if (textareas.length > 0) {
-                    const elem = textareas[0];
-                    elem.focus();
-                    elem.value = code;
-                    elem.dispatchEvent(new Event('input', { bubbles: true }));
-                    elem.dispatchEvent(new Event('change', { bubbles: true }));
-                    return "Textarea value updated in " + doc.location.href;
-                }
-            } catch(e) {}
-
-            // 6. Contenteditable
-            try {
-                const ces = Array.from(doc.querySelectorAll('[contenteditable="true"]')).filter(
-                    el => !el.closest('.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, #__omnitasker_panel')
-                );
-                ces.sort((a, b) => {
-                    const rA = a.getBoundingClientRect();
-                    const rB = b.getBoundingClientRect();
-                    return (rB.width * rB.height) - (rA.width * rA.height);
-                });
-                if (ces.length > 0) {
-                    const elem = ces[0];
-                    elem.focus();
-                    try {
-                        const sel = win.getSelection();
-                        const range = doc.createRange();
-                        range.selectNodeContents(elem);
-                        sel.removeAllRanges();
-                        sel.addRange(range);
-                        if (doc.execCommand('insertText', false, code)) {
-                            return "Contenteditable execCommand updated in " + doc.location.href;
-                        }
-                    } catch(e) {}
-                    elem.innerText = code;
-                    elem.dispatchEvent(new Event('input', { bubbles: true }));
-                    elem.dispatchEvent(new Event('change', { bubbles: true }));
-                    return "Contenteditable updated in " + doc.location.href;
-                }
-            } catch(e) {}
-
-            // 7. Drill into same-origin iframes
-            try {
-                const iframes = doc.querySelectorAll('iframe');
-                for (const iframe of iframes) {
-                    try {
-                        const iframeDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-                        if (iframeDoc) {
-                            const res = setEditorCodeRecursively(iframeDoc, code);
-                            if (res) return res;
-                        }
-                    } catch(e) {}
-                }
-            } catch(e) {}
-
-            return null;
-        }
-        return setEditorCodeRecursively(document, code, target);
-    }"""
-
-    injected = None
-    try:
-        injected = await page.evaluate(js_script, code, target or "")
-    except Exception as e:
-        print(f"JS code injection evaluation note: {e}")
-
-    if not injected:
-        try:
-            fallback_script = """(code) => {
-                for (const selector of [".monaco-editor textarea.inputarea", ".CodeMirror", ".ace_editor", ".cm-content", "[contenteditable='true']", "textarea"]) {
-                    const el = document.querySelector(selector);
-                    if (el && el.offsetParent !== null) {
-                        try {
-                            el.focus();
-                            if ('value' in el) {
-                                el.value = code;
-                                el.dispatchEvent(new Event('input', { bubbles: true }));
-                                el.dispatchEvent(new Event('change', { bubbles: true }));
-                                return "Editor fallback updated via value: " + selector;
-                            }
-                            const sel = window.getSelection();
-                            const range = document.createRange();
-                            range.selectNodeContents(el);
-                            sel.removeAllRanges();
-                            sel.addRange(range);
-                            if (document.execCommand('insertText', false, code)) {
-                                return "Editor fallback updated via execCommand: " + selector;
-                            }
-                            el.innerText = code;
-                            el.dispatchEvent(new Event('input', { bubbles: true }));
-                            el.dispatchEvent(new Event('change', { bubbles: true }));
-                            return "Editor fallback updated via innerText: " + selector;
-                        } catch(e) {}
-                    }
-                }
-                return null;
-            }"""
-            injected = await page.evaluate(fallback_script, code)
-        except Exception as fb_err:
-            print(f"Direct injection DOM fallback note: {fb_err}")
-
-    return injected
+    from editor_adapters import safe_write
+    success, _, _ = await safe_write(page, code, target=target)
+    return "Editor updated and readback verified" if success else None
 
 
 async def extract_ref_images_to_disk(

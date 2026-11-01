@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
 import re
 from abc import ABC, abstractmethod
 from typing import Optional, Any, Tuple, Dict, List
@@ -51,126 +52,57 @@ function searchIframes(fn, win) {
 }
 """
 
-JS_MULTI_EDITOR_HELPERS = """
-function normalizeTarget(t) {
-    return (t || '').toLowerCase().trim();
-}
-
+JS_MULTI_EDITOR_HELPERS = r"""
+function normalizeTarget(t) { return String(t || '').toLowerCase().trim(); }
 function matchesTargetKeywords(text, target) {
-    if (!text || !target) return false;
-    const lower = text.toLowerCase();
-    const t = normalizeTarget(target);
-    if (t === 'css') {
-        return lower === 'css' || lower.includes('css') || lower.includes('style') || lower.includes('stylesheet');
-    }
-    if (t === 'html') {
-        return lower === 'html' || lower.includes('html') || lower.includes('index.html');
-    }
-    if (t === 'js' || t === 'javascript') {
-        return lower === 'js' || lower === 'javascript' || lower.includes('script.js');
-    }
-    return lower === t || lower.includes(t);
+    const value = normalizeTarget(text), t = normalizeTarget(target);
+    if (!value || !t) return false;
+    if (value === t) return true;
+    const tokens = value.split(/[^a-z0-9]+/);
+    const aliases = {html:['html','htm','htmlmixed','xml'], css:['css','stylesheet'],
+                     javascript:['javascript','js'], js:['javascript','js']};
+    return (aliases[t] || []).some(alias => tokens.includes(alias));
 }
-
-function clickMatchingTab(doc, target) {
-    if (!doc || !target) return false;
-    const t = normalizeTarget(target);
-    const keywords = (t === 'css') ? [/^css$/i, /style\\.css/i, /styles\\.css/i, /stylesheet/i] :
-                     (t === 'html') ? [/^html$/i, /index\\.html/i] :
-                     (t === 'js' || t === 'javascript') ? [/^js$/i, /^javascript$/i, /script\\.js/i] :
-                     [new RegExp('^' + t + '$', 'i')];
-
-    const candidates = Array.from(doc.querySelectorAll('button, [role="tab"], .tab, .nav-link, a, span, div')).filter(el => {
-        const txt = (el.textContent || '').trim();
-        return keywords.some(rx => rx.test(txt)) && el.getClientRects().length > 0;
-    });
-    for (const tab of candidates) {
-        const isSelected = tab.getAttribute('aria-selected') === 'true' ||
-                           tab.classList.contains('active') ||
-                           tab.classList.contains('selected');
-        if (!isSelected) {
-            try {
-                tab.click();
-                return true;
-            } catch(e) {}
+function editorEvidence(el, doc) {
+    const evidence = [];
+    const selector = '.monaco-editor, .CodeMirror, .cm-editor, .ace_editor, textarea, [contenteditable="true"]';
+    for (let node = el; node && node !== doc.body; node = node.parentElement) {
+        // Never borrow a sibling editor's heading from a common container.
+        if (node !== el && Array.from(node.querySelectorAll(selector)).filter(candidate =>
+            !candidate.parentElement?.closest(selector)).length > 1) break;
+        for (const key of ['id','name','aria-label','data-lang','data-language','data-mode','data-filename']) {
+            evidence.push(node.getAttribute(key) || '');
         }
+        for (const id of (node.getAttribute('aria-labelledby') || '').split(/\s+/)) {
+            evidence.push(doc.getElementById(id)?.textContent || '');
+        }
+        const heading = node.querySelector('label,h1,h2,h3,h4,h5,h6,.filename');
+        if (heading) evidence.push(heading.textContent || '');
     }
-    return false;
+    try {
+        const cm = el.CodeMirror;
+        if (cm) { const mode = cm.getOption('mode'); evidence.push(typeof mode === 'string' ? mode : mode?.name || ''); }
+        const ace = el.env?.editor;
+        if (ace) evidence.push(ace.getSession().getMode().$id);
+    } catch (_) {}
+    return evidence;
 }
-
+function editorLanguage(el, doc) {
+    const evidence = editorEvidence(el, doc);
+    const matches = ['html','css','javascript'].filter(lang => evidence.some(e => matchesTargetKeywords(e, lang)));
+    return matches.length === 1 ? matches[0] : 'unknown';
+}
 function findEditorElementForTarget(elements, target, doc) {
-    if (!elements || elements.length === 0) return null;
-    if (elements.length === 1 && !target) return elements[0];
-    const t = normalizeTarget(target);
-    if (!t) {
-        return elements.find(el => el.offsetParent !== null) || elements[0];
-    }
-
-    // 1. Check element attributes
-    for (const el of elements) {
-        const id = el.id || '';
-        const cls = el.className || '';
-        const dataLang = el.getAttribute('data-lang') || el.getAttribute('data-language') || el.getAttribute('data-mode') || '';
-        const ariaLabel = el.getAttribute('aria-label') || '';
-        const name = el.getAttribute('name') || '';
-        if (matchesTargetKeywords(id, t) || matchesTargetKeywords(cls, t) || matchesTargetKeywords(dataLang, t) || matchesTargetKeywords(ariaLabel, t) || matchesTargetKeywords(name, t)) {
-            return el;
-        }
-    }
-
-    // 2. Check surrounding labels, headers, or tab panels
-    for (const el of elements) {
-        let curr = el;
-        for (let depth = 0; depth < 5 && curr && curr !== doc.body; depth++) {
-            const heading = curr.querySelector('h1, h2, h3, h4, h5, h6, .tab, .tab-pane, .header, .title, .filename, label, [role="tab"], .nav-link, span');
-            if (heading && matchesTargetKeywords(heading.textContent, t)) {
-                return el;
-            }
-            const prev = curr.previousElementSibling;
-            if (prev && matchesTargetKeywords(prev.textContent, t)) {
-                return el;
-            }
-            const pData = curr.getAttribute('data-tab') || curr.getAttribute('data-lang') || curr.id || curr.className || '';
-            if (matchesTargetKeywords(pData, t)) {
-                return el;
-            }
-            curr = curr.parentElement;
-        }
-    }
-
-    // 3. Check editor internal session / mode
-    for (const el of elements) {
-        try {
-            const win = doc.defaultView || window;
-            if (win.ace && win.ace.edit) {
-                const ed = win.ace.edit(el);
-                const mode = ed.getSession().getMode().$id || '';
-                if (matchesTargetKeywords(mode, t)) return el;
-            }
-            if (el.env && el.env.editor) {
-                const mode = el.env.editor.getSession().getMode().$id || '';
-                if (matchesTargetKeywords(mode, t)) return el;
-            }
-        } catch(e) {}
-        try {
-            if (el.CodeMirror) {
-                const mode = el.CodeMirror.getOption('mode');
-                const modeStr = typeof mode === 'string' ? mode : (mode && mode.name ? mode.name : '');
-                if (matchesTargetKeywords(modeStr, t)) return el;
-            }
-        } catch(e) {}
-    }
-
-    // 4. Layout order fallback for standard multi-editor setups
-    if (elements.length >= 2) {
-        if (t === 'html') return elements[0];
-        if (t === 'css') return elements[1];
-        if (t === 'js' || t === 'javascript') return elements[2] || elements[elements.length - 1];
-    }
-
-    return elements.find(el => el.offsetParent !== null) || elements[0];
+    if (!elements.length) return null;
+    if (!target) return elements.find(el => el.getClientRects().length) || elements[0];
+    const key = normalizeTarget(target);
+    const indexed = /^editor_(\d+)$/.exec(key);
+    if (indexed) return elements[Number(indexed[1])] || null;
+    const matches = elements.filter(el => editorEvidence(el, doc).some(e => matchesTargetKeywords(e, key)));
+    return matches.length === 1 ? matches[0] : null;
 }
 """
+
 
 def classify_code_language(code: str) -> str:
     """Classify whether code is 'html', 'css', 'javascript', or 'unknown'."""
@@ -220,11 +152,10 @@ def split_multi_editor_code(code: str) -> Dict[str, str]:
     css_blocks = re.findall(r'```(?:css)\s*\n([\s\S]*?)```', code, re.IGNORECASE)
     js_blocks = re.findall(r'```(?:javascript|js)\s*\n([\s\S]*?)```', code, re.IGNORECASE)
 
-    if html_blocks and css_blocks:
-        result["html"] = "\n\n".join(b.strip() for b in html_blocks)
-        result["css"] = "\n\n".join(b.strip() for b in css_blocks)
-        if js_blocks:
-            result["javascript"] = "\n\n".join(b.strip() for b in js_blocks)
+    if html_blocks or css_blocks or js_blocks:
+        for language, blocks in (("html", html_blocks), ("css", css_blocks), ("javascript", js_blocks)):
+            if blocks:
+                result[language] = "\n\n".join(b.strip() for b in blocks)
         return result
 
     # 2. Check for explicit comment / header sections
@@ -397,7 +328,7 @@ class MonacoAdapter(EditorAdapter):
             except Exception:
                 return False
 
-        script = f"""(code, target) => {{
+        script = f"""({{code, target}}) => {{
             {JS_RECURSIVE_SEARCH}
             {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
@@ -408,36 +339,20 @@ class MonacoAdapter(EditorAdapter):
                     const validModels = models.filter(m => !m.uri || !m.uri.path.endsWith('.d.ts'));
 
                     if (targetLower) {{
-                        let matchedModel = validModels.find(m => {{
+                        const matchingModels = validModels.filter(m => {{
                             const lang = (m.getLanguageId ? m.getLanguageId() : '').toLowerCase();
                             const path = (m.uri ? (m.uri.path || m.uri.toString()) : '').toLowerCase();
                             return matchesTargetKeywords(lang, targetLower) || matchesTargetKeywords(path, targetLower);
                         }});
+                        const matchedModel = matchingModels.length === 1 ? matchingModels[0] : null;
                         if (matchedModel) {{
                             matchedModel.setValue(code);
-                            for (const ed of eds) {{
-                                try {{
-                                    if (ed.getDomNode() && ed.getDomNode().offsetParent !== null) {{
-                                        ed.setModel(matchedModel);
-                                        break;
-                                    }}
-                                }} catch(e) {{}}
-                            }}
-                            if (win.document) clickMatchingTab(win.document, targetLower);
                             return true;
                         }}
-                        for (const ed of eds) {{
-                            try {{
-                                const m = ed.getModel();
-                                const lang = m && m.getLanguageId ? m.getLanguageId().toLowerCase() : '';
-                                const path = m && m.uri ? (m.uri.path || m.uri.toString()).toLowerCase() : '';
-                                if (matchesTargetKeywords(lang, targetLower) || matchesTargetKeywords(path, targetLower)) {{
-                                    ed.setValue(code);
-                                    return true;
-                                }}
-                            }} catch(e) {{}}
-                        }}
+
                     }}
+
+                    if (targetLower) return false;
 
                     if (eds.length > 0) {{
                         for (const ed of eds) {{
@@ -483,7 +398,7 @@ class MonacoAdapter(EditorAdapter):
             }}) || false;
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script, code, target), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, {"code": code, "target": target}), timeout=10.0)
             return str(res).lower() == "true" or res is True
         except Exception:
             return False
@@ -547,12 +462,13 @@ class MonacoAdapter(EditorAdapter):
                     const validModels = models.filter(m => !m.uri || !m.uri.path.endsWith('.d.ts'));
 
                     if (targetLower && validModels.length > 0) {{
-                        const matched = validModels.find(m => {{
+                        const matches = validModels.filter(m => {{
                             const lang = (m.getLanguageId ? m.getLanguageId() : '').toLowerCase();
                             const path = (m.uri ? (m.uri.path || m.uri.toString()) : '').toLowerCase();
                             return matchesTargetKeywords(lang, targetLower) || matchesTargetKeywords(path, targetLower);
                         }});
-                        if (matched) return matched.getValue();
+                        if (matches.length === 1) return matches[0].getValue();
+                        return null;
                     }}
 
                     if (eds.length > 0) {{
@@ -590,35 +506,39 @@ class MonacoAdapter(EditorAdapter):
             return ""
 
     async def get_language(self, page: Any, target: Optional[str] = None) -> Optional[str]:
-        script = f"""() => {{
+        script = f"""(target) => {{
             {JS_RECURSIVE_SEARCH}
+            {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
                 if (typeof win.monaco !== 'undefined' && typeof win.monaco.editor !== 'undefined') {{
-                    const models = win.monaco.editor.getModels();
+                    const models = win.monaco.editor.getModels().filter(m => !target ||
+                        matchesTargetKeywords(m.getLanguageId?.(), target) || matchesTargetKeywords(m.uri?.path || m.uri?.toString(), target));
                     if (models.length > 0 && models[0].getLanguageId) return models[0].getLanguageId();
                 }}
                 return null;
             }});
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, target), timeout=10.0)
             return str(res) if res else None
         except Exception:
             return None
 
     async def get_model_id(self, page: Any, target: Optional[str] = None) -> Optional[str]:
-        script = f"""() => {{
+        script = f"""(target) => {{
             {JS_RECURSIVE_SEARCH}
+            {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
                 if (typeof win.monaco !== 'undefined' && typeof win.monaco.editor !== 'undefined') {{
-                    const models = win.monaco.editor.getModels();
+                    const models = win.monaco.editor.getModels().filter(m => !target ||
+                        matchesTargetKeywords(m.getLanguageId?.(), target) || matchesTargetKeywords(m.uri?.path || m.uri?.toString(), target));
                     if (models.length > 0 && models[0].uri) return models[0].uri.toString();
                 }}
                 return null;
             }});
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, target), timeout=10.0)
             return str(res) if res else None
         except Exception:
             return None
@@ -683,7 +603,7 @@ class CodeMirror5Adapter(EditorAdapter):
             except Exception:
                 return False
 
-        script = f"""(code, target) => {{
+        script = f"""({{code, target}}) => {{
             {JS_RECURSIVE_SEARCH}
             {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
@@ -691,15 +611,13 @@ class CodeMirror5Adapter(EditorAdapter):
                 const elems = Array.from(win.document.querySelectorAll('.CodeMirror'));
                 if (elems.length === 0) return false;
                 const targetLower = normalizeTarget(target);
-                if (targetLower && win.document) {{
-                    clickMatchingTab(win.document, targetLower);
-                }}
                 const targetEl = findEditorElementForTarget(elems, targetLower, win.document);
                 if (targetEl && targetEl.CodeMirror) {{
                     targetEl.CodeMirror.setValue(code);
                     if (targetEl.CodeMirror.save) targetEl.CodeMirror.save();
                     return true;
                 }}
+                if (targetLower) return false;
                 elems.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
@@ -716,7 +634,7 @@ class CodeMirror5Adapter(EditorAdapter):
             }}) || false;
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script, code, target), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, {"code": code, "target": target}), timeout=10.0)
             return str(res).lower() == "true" or res is True
         except Exception:
             return False
@@ -758,11 +676,13 @@ class CodeMirror5Adapter(EditorAdapter):
                 if (targetEl && targetEl.CodeMirror) {{
                     return targetEl.CodeMirror.getValue();
                 }}
+                if (targetLower) return false;
                 elems.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
                     return (rB.width * rB.height) - (rA.width * rA.height);
                 }});
+                if (targetLower) return null;
                 for (const el of elems) {{
                     if (el.CodeMirror) return el.CodeMirror.getValue();
                 }}
@@ -883,16 +803,13 @@ class CodeMirror6Adapter(EditorAdapter):
             except Exception:
                 return False
 
-        script = f"""(code, target) => {{
+        script = f"""({{code, target}}) => {{
             {JS_RECURSIVE_SEARCH}
             {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
                 if (!win.document) return false;
                 const cmEditors = Array.from(win.document.querySelectorAll('.cm-editor'));
                 const targetLower = normalizeTarget(target);
-                if (targetLower && win.document) {{
-                    clickMatchingTab(win.document, targetLower);
-                }}
                 if (cmEditors.length > 0) {{
                     const targetEl = findEditorElementForTarget(cmEditors, targetLower, win.document);
                     if (targetEl) {{
@@ -905,6 +822,7 @@ class CodeMirror6Adapter(EditorAdapter):
                         }}
                     }}
                 }}
+                if (targetLower) return false;
                 cmEditors.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
@@ -923,7 +841,7 @@ class CodeMirror6Adapter(EditorAdapter):
             }}) || false;
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script, code, target), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, {"code": code, "target": target}), timeout=10.0)
             return str(res).lower() == "true" or res is True
         except Exception:
             return False
@@ -988,11 +906,13 @@ class CodeMirror6Adapter(EditorAdapter):
                         }}
                     }}
                 }}
+                if (targetLower) return false;
                 cmEditors.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
                     return (rB.width * rB.height) - (rA.width * rA.height);
                 }});
+                if (targetLower) return null;
                 for (const cmEditor of cmEditors) {{
                     const view = (cmEditor.cmView && (cmEditor.cmView.view || (typeof cmEditor.cmView.dispatch === 'function' ? cmEditor.cmView : null)));
                     if (view && view.state && view.state.doc) {{
@@ -1074,16 +994,13 @@ class AceAdapter(EditorAdapter):
             except Exception:
                 return False
 
-        script = f"""(code, target) => {{
+        script = f"""({{code, target}}) => {{
             {JS_RECURSIVE_SEARCH}
             {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
                 if (!win.document) return false;
                 const elems = Array.from(win.document.querySelectorAll('.ace_editor'));
                 const targetLower = normalizeTarget(target);
-                if (targetLower && win.document) {{
-                    clickMatchingTab(win.document, targetLower);
-                }}
                 const targetEl = findEditorElementForTarget(elems, targetLower, win.document);
                 if (targetEl) {{
                     if (typeof win.ace !== 'undefined' && win.ace.edit) {{
@@ -1095,6 +1012,7 @@ class AceAdapter(EditorAdapter):
                         return true;
                     }}
                 }}
+                if (targetLower) return false;
                 elems.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
@@ -1114,7 +1032,7 @@ class AceAdapter(EditorAdapter):
             }}) || false;
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script, code, target), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, {"code": code, "target": target}), timeout=10.0)
             return str(res).lower() == "true" or res is True
         except Exception:
             return False
@@ -1156,11 +1074,13 @@ class AceAdapter(EditorAdapter):
                     if (typeof win.ace !== 'undefined' && win.ace.edit) return win.ace.edit(targetEl).getValue();
                     if (targetEl.env && targetEl.env.editor) return targetEl.env.editor.getValue();
                 }}
+                if (targetLower) return false;
                 elems.sort((a, b) => {{
                     const rA = a.getBoundingClientRect();
                     const rB = b.getBoundingClientRect();
                     return (rB.width * rB.height) - (rA.width * rA.height);
                 }});
+                if (targetLower) return null;
                 for (const el of elems) {{
                     if (typeof win.ace !== 'undefined' && win.ace.edit) return win.ace.edit(el).getValue();
                     if (el.env && el.env.editor) return el.env.editor.getValue();
@@ -1284,21 +1204,18 @@ class TextareaAdapter(EditorAdapter):
             except Exception:
                 return False
 
-        script = f"""(code, target) => {{
+        script = f"""({{code, target}}) => {{
             {JS_RECURSIVE_SEARCH}
             {JS_MULTI_EDITOR_HELPERS}
             return searchIframes((win) => {{
                 if (!win.document) return false;
                 const targetLower = normalizeTarget(target);
-                if (targetLower && win.document) {{
-                    clickMatchingTab(win.document, targetLower);
-                }}
                 const tas = Array.from(win.document.querySelectorAll('textarea')).filter(
                     el => !el.closest('.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, #__omnitasker_panel')
                 );
                 if (tas.length > 0) {{
                     const targetEl = findEditorElementForTarget(tas, targetLower, win.document);
-                    const el = targetEl || tas[0];
+                    const el = targetEl;
                     if (el) {{
                         el.focus();
                         el.value = code;
@@ -1311,7 +1228,7 @@ class TextareaAdapter(EditorAdapter):
                     ce => !ce.closest('.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, #__omnitasker_panel')
                 );
                 const targetCe = findEditorElementForTarget(ces, targetLower, win.document);
-                const ce = targetCe || (ces.length > 0 ? ces[0] : null);
+                const ce = targetCe;
                 if (ce) {{
                     ce.focus();
                     try {{
@@ -1331,7 +1248,7 @@ class TextareaAdapter(EditorAdapter):
             }}) || false;
         }}"""
         try:
-            res = await asyncio.wait_for(page.evaluate(script, code, target), timeout=10.0)
+            res = await asyncio.wait_for(page.evaluate(script, {"code": code, "target": target}), timeout=10.0)
             return str(res).lower() == "true" or res is True
         except Exception:
             return False
@@ -1382,14 +1299,14 @@ class TextareaAdapter(EditorAdapter):
                 );
                 if (tas.length > 0) {{
                     const targetEl = findEditorElementForTarget(tas, targetLower, win.document);
-                    const el = targetEl || tas[0];
+                    const el = targetEl;
                     if (el) return el.value;
                 }}
                 const ces = Array.from(win.document.querySelectorAll('[contenteditable="true"]')).filter(
                     ce => !ce.closest('.monaco-editor, .CodeMirror, .ace_editor, .cm-editor, #__omnitasker_panel')
                 );
                 const targetCe = findEditorElementForTarget(ces, targetLower, win.document);
-                const ce = targetCe || (ces.length > 0 ? ces[0] : null);
+                const ce = targetCe;
                 if (ce) return ce.innerText || ce.textContent || "";
                 return null;
             }}) || "";
@@ -1454,13 +1371,24 @@ async def get_all_editors_summary(page: Any) -> List[Dict[str, Any]]:
                             'kind': 'monaco',
                             'language': lang || (path.endsWith('.css') ? 'css' : path.endsWith('.html') ? 'html' : 'unknown'),
                             'label': path || (lang ? lang.toUpperCase() : 'Editor ' + (idx + 1)),
-                            'target_key': targetKey,
+                            'target_key': path || targetKey,
                             'content': m.getValue(),
                             'is_active': true
                         }});
                     }});
                     return true;
                 }}
+            }}
+            const monacoNodes = Array.from(win.document.querySelectorAll('.monaco-editor'));
+            if (monacoNodes.length) {{
+                monacoNodes.forEach((el, idx) => results.push({{
+                    index: results.length, kind: 'monaco', language: editorLanguage(el, win.document),
+                    label: editorEvidence(el, win.document).filter(Boolean).join(' / ') || 'Editor ' + (idx + 1),
+                    target_key: 'monaco:editor_' + idx,
+                    content: Array.from(el.querySelectorAll('.view-line')).map(line => line.textContent).join('\\n'),
+                    is_active: !!el.getClientRects().length
+                }}));
+                return true;
             }}
             // 2. CodeMirror 5
             const cm5s = Array.from(win.document.querySelectorAll('.CodeMirror'));
@@ -1469,14 +1397,14 @@ async def get_all_editors_summary(page: Any) -> List[Dict[str, Any]]:
                     if (el.CodeMirror) {{
                         const mode = el.CodeMirror.getOption('mode');
                         const modeStr = typeof mode === 'string' ? mode : (mode && mode.name ? mode.name : '');
-                        const lang = modeStr.includes('css') ? 'css' : (modeStr.includes('html') || modeStr.includes('xml')) ? 'html' : 'unknown';
-                        const targetKey = lang !== 'unknown' ? lang : (idx === 0 ? 'html' : idx === 1 ? 'css' : 'editor_' + idx);
+                        const lang = editorLanguage(el, win.document);
+                        const targetKey = 'editor_' + idx;
                         results.push({{
                             'index': results.length,
                             'kind': 'codemirror5',
-                            'language': lang !== 'unknown' ? lang : targetKey,
+                            'language': lang,
                             'label': targetKey.toUpperCase() + ' Editor',
-                            'target_key': targetKey,
+                            'target_key': 'codemirror5:' + targetKey,
                             'content': el.CodeMirror.getValue(),
                             'is_active': el.offsetParent !== null
                         }});
@@ -1488,15 +1416,16 @@ async def get_all_editors_summary(page: Any) -> List[Dict[str, Any]]:
             const cm6s = Array.from(win.document.querySelectorAll('.cm-editor'));
             if (cm6s.length > 0) {{
                 cm6s.forEach((el, idx) => {{
-                    const targetKey = idx === 0 ? 'html' : idx === 1 ? 'css' : 'editor_' + idx;
+                    const targetKey = 'editor_' + idx;
+                    const lang = editorLanguage(el, win.document);
                     const view = el.cmView && (el.cmView.view || el.cmView);
                     const content = view && view.state && view.state.doc ? view.state.doc.toString() : (el.textContent || '');
                     results.push({{
                         'index': results.length,
                         'kind': 'codemirror6',
-                        'language': targetKey,
+                        'language': lang,
                         'label': targetKey.toUpperCase() + ' Editor',
-                        'target_key': targetKey,
+                        'target_key': 'codemirror6:' + targetKey,
                         'content': content,
                         'is_active': el.offsetParent !== null
                     }});
@@ -1514,14 +1443,14 @@ async def get_all_editors_summary(page: Any) -> List[Dict[str, Any]]:
                     if (ed) {{
                         const session = ed.getSession ? ed.getSession() : null;
                         const mode = session && session.getMode ? (session.getMode().$id || '') : '';
-                        const lang = mode.includes('css') ? 'css' : mode.includes('html') ? 'html' : 'unknown';
-                        const targetKey = lang !== 'unknown' ? lang : (idx === 0 ? 'html' : idx === 1 ? 'css' : 'editor_' + idx);
+                        const lang = ['html','css','javascript'].find(value => matchesTargetKeywords(mode, value)) || editorLanguage(el, win.document);
+                        const targetKey = 'editor_' + idx;
                         results.push({{
                             'index': results.length,
                             'kind': 'ace',
-                            'language': lang !== 'unknown' ? lang : targetKey,
+                            'language': lang,
                             'label': targetKey.toUpperCase() + ' Editor',
-                            'target_key': targetKey,
+                            'target_key': 'ace:' + targetKey,
                             'content': ed.getValue ? ed.getValue() : '',
                             'is_active': el.offsetParent !== null
                         }});
@@ -1529,12 +1458,21 @@ async def get_all_editors_summary(page: Any) -> List[Dict[str, Any]]:
                 }});
                 return true;
             }}
+            const textareas = Array.from(win.document.querySelectorAll('textarea')).filter(el =>
+                !el.closest('#__omnitasker_panel, .monaco-editor, .CodeMirror, .cm-editor, .ace_editor'));
+            textareas.forEach((el, idx) => results.push({{
+                index: results.length, kind: 'textarea', language: editorLanguage(el, win.document),
+                label: el.getAttribute('aria-label') || el.name || el.id || 'Editor ' + (idx + 1),
+                target_key: 'textarea:editor_' + idx, content: el.value, is_active: !!el.getClientRects().length
+            }}));
             return null;
         }});
         return results;
     }}"""
     try:
         res = await asyncio.wait_for(page.evaluate(script), timeout=10.0)
+        if isinstance(res, str):
+            res = json.loads(res)
         return res if isinstance(res, list) else []
     except Exception:
         return []
@@ -1546,6 +1484,12 @@ async def _safe_write_single(
     adapter: Optional[EditorAdapter] = None,
     target: Optional[str] = None,
 ) -> Tuple[bool, WorkspaceSnapshot, str]:
+    if target and ':' in target:
+        kind, _, local_key = target.partition(':')
+        kinds = {"monaco": MonacoAdapter, "codemirror5": CodeMirror5Adapter,
+                 "codemirror6": CodeMirror6Adapter, "ace": AceAdapter, "textarea": TextareaAdapter}
+        if kind in kinds:
+            adapter, target = kinds[kind](), local_key
     adapters_to_try = []
     if adapter is not None:
         adapters_to_try.append(adapter)
@@ -1593,11 +1537,8 @@ async def _safe_write_single(
             if success:
                 if norm_readback == norm_code:
                     return True, last_snap, readback_content
-                if norm_code and norm_code in norm_readback:
-                    return True, last_snap, readback_content
-                if norm_code and norm_readback and (norm_readback in norm_code) and len(norm_readback) >= 0.8 * len(norm_code):
-                    return True, last_snap, readback_content
         except Exception:
+            logger.warning("Editor write failed (%s, target=%r)", type(ad).__name__, target, exc_info=True)
             continue
 
     return False, last_snap, last_readback
@@ -1613,20 +1554,41 @@ async def safe_write(
     Perform a safe write cycle to the editor with snapshot-before-write, write, and normalized readback verification.
     Supports multi-editor targeting (HTML, CSS, JS) and automatic multi-code decomposition.
     """
-    # 1. Multi-code split: if code contains both HTML and CSS, and target is not forced
-    if target is None:
+    editors = await get_all_editors_summary(page)
+    if target is not None:
         parts = split_multi_editor_code(code)
-        if "html" in parts and "css" in parts:
-            h_ok, h_snap, h_read = await _safe_write_single(page, parts["html"], adapter=adapter, target="html")
-            c_ok, c_snap, c_read = await _safe_write_single(page, parts["css"], adapter=adapter, target="css")
-            if h_ok and c_ok:
-                return True, h_snap, f"/* Verified: HTML ({len(h_read)} chars) and CSS ({len(c_read)} chars) written */"
-            if h_ok or c_ok:
-                return True, h_snap if h_ok else c_snap, h_read if h_ok else c_read
+        if len(editors) > 1 and len(parts) > 1:
+            available = {e.get("language") for e in editors}
+            if set(parts) <= available:
+                # A combined response must use each observed destination, never one forced pane.
+                target = None
+            elif "```" in code:
+                return False, WorkspaceSnapshot(content=""), "Multiple source files supplied for one editor; write each file separately."
+        if target is not None:
+            return await _safe_write_single(page, code, adapter=adapter, target=target)
 
-        # 2. Single language detection
-        detected_lang = classify_code_language(code)
-        if detected_lang in ("html", "css", "javascript"):
-            target = detected_lang
+    # Only distribute source across files that actually exist in this workspace.
+    # A single HTML file may legitimately contain inline styles and scripts.
+    if len(editors) > 1:
+        parts = split_multi_editor_code(code)
+        destinations = {}
+        for language in parts:
+            matches = [e for e in editors if e.get("language") == language]
+            if len(matches) != 1:
+                return False, WorkspaceSnapshot(content=""), "Ambiguous editor destination; read the editors and provide target_editor."
+            destinations[language] = matches[0].get("target_key") or language
+        if not parts:
+            return False, WorkspaceSnapshot(content=""), "Multiple editors found; provide target_editor."
+        first_snapshot = None
+        readbacks = []
+        for language, source in parts.items():
+            ok, snap, readback = await _safe_write_single(
+                page, source, adapter=adapter, target=destinations[language])
+            if first_snapshot is None:
+                first_snapshot = snap
+            if not ok:
+                return False, first_snapshot, readback
+            readbacks.append(f"```{language}\n{readback}\n```")
+        return True, first_snapshot, "\n\n".join(readbacks)
 
-    return await _safe_write_single(page, code, adapter=adapter, target=target)
+    return await _safe_write_single(page, code, adapter=adapter)
